@@ -84,34 +84,6 @@ class UnityEyes(BaseDataSource):
             super().reset()
             self._current_index = 0
 
-    def entry_generator(self, yield_just_one=False):
-        """Read entry from UnityEyes."""
-        try:
-            while range(1) if yield_just_one else True:
-                with self._mutex:
-                    if self._current_index >= self.num_entries:
-                        if self.testing:
-                            break
-                        else:
-                            self._current_index = 0
-                    current_index = self._current_index
-                    self._current_index += 1
-
-                file_stem = self._file_stems[current_index]
-                jpg_path = '%s/%s.jpg' % (self._images_path, file_stem)
-                json_path = '%s/%s.json' % (self._images_path, file_stem)
-                with open(json_path, 'r') as f:
-                    json_data = ujson.load(f)
-                entry = {
-                    'full_image': cv.imread(jpg_path, cv.IMREAD_GRAYSCALE),
-                    'json_data': json_data,
-                }
-                assert entry['full_image'] is not None
-                yield entry
-        finally:
-            # Execute any cleanup operations as necessary
-            pass
-
     def set_difficulty(self, difficulty):
         """Set difficulty of training data."""
         assert isinstance(difficulty, float)
@@ -345,31 +317,3 @@ class UnityEyes(BaseDataSource):
     def _save_pickle(self, obj, filename):
         with open(filename, 'wb') as handle:
             pickle.dump(obj, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-    def entry_generator(self, yield_just_one=False):
-        """Read entry from UnityEyes."""
-        try:
-            while range(1) if yield_just_one else True:
-                with self._mutex:
-                    if self._current_index >= self.num_entries:
-                        if self.testing:
-                            break
-                        else:
-                            self._current_index = 0
-                    current_index = self._current_index
-                    self._current_index += 1
-
-                file_stem = self._file_stems[current_index]
-                jpg_path = '%s/%s.jpg' % (self._images_path, file_stem)
-                json_path = '%s/%s.json' % (self._images_path, file_stem)
-                with open(json_path, 'r') as f:
-                    json_data = ujson.load(f)
-                entry = {
-                    'full_image': cv.imread(jpg_path, cv.IMREAD_GRAYSCALE),
-                    'json_data': json_data,
-                }
-                assert entry['full_image'] is not None
-                yield entry
-        finally:
-            # Execute any cleanup operations as necessary
-            pass

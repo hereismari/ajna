@@ -23,7 +23,8 @@ class DataSource(object):
 
         base_dataset = base_dataset.map(lambda filename: tuple(tf.py_func(
             self._preprocess_pickle, [filename], [tf.float32, tf.float32, tf.float32, tf.float32])))
-
+        base_dataset = base_dataset.map(self._set_shapes)
+    
         self._dataset_single = base_dataset.cache().batch(self.batch_size)
         self._dataset = base_dataset.cache() \
                 .shuffle(10000*self.batch_size, seed=seed) \
@@ -32,11 +33,21 @@ class DataSource(object):
 
         self.iter = tf.data.Iterator.from_structure(self._dataset.output_types,
                                                     self._dataset.output_shapes)
+        self.tensors = self.iter.get_next()
         self.make_initializer(self.iter)
+
+        self.x_shape = (36, 60)
     
     def _preprocess_pickle(self, filename):
         data = pickle.load(open(filename, 'rb'))
         return data['eye'], data['heatmaps'], data['landmarks'], data['radius']
+    
+    def _set_shapes(self, eye, heatmaps, landmarks, radius):
+        eye.set_shape([1, 36, 60])
+        heatmaps.set_shape([18, 36, 60])
+        landmarks.set_shape([18, 2])
+        radius.set_shape([])
+        return eye, heatmaps, landmarks, radius
 
     def make_initializer(self, iter):
         self._init_op = iter.make_initializer(self._dataset)
