@@ -1,6 +1,7 @@
 *__pycache__
 *.db
-
+checkpoints/
+*.cpkl
 *.pickle
 *.jpg
 *.json
