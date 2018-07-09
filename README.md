@@ -1,5 +1,9 @@
 # Ajna
 
+## Dependências
+
+TODO
+
 ## Obtendo os dados
 
 1. Siga as intruções aqui: https://www.cl.cam.ac.uk/research/rainbow/projects/unityeyes/. **aparentemente está funcionando apenas no Windows**.
