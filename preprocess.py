@@ -6,19 +6,13 @@ import coloredlogs
 import tensorflow as tf
 
 from preprocessing.unityeyes import UnityEyes
-from models.cnn import ELG
+from models.cnn import CNN
 
 if __name__ == '__main__':
-    
     unityeyes = UnityEyes(
-        None,
         data_format='NCHW',
         images_path='datasets',
-        batch_size=32,
-        # min_after_dequeue=1000,
         generate_heatmaps=True,
-        #shuffle=True,
-        #staging=True,
         eye_image_shape=(36, 60),
         heatmaps_scale=1.0
     )

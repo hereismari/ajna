@@ -2,40 +2,30 @@
 Originally from: https://github.com/swook/GazeML
 Modified by: @mari-linhares
 
-UnityEyes data source for gaze estimation.
+UnityEyes data source for gaze estimation modified to preprocess data.
 """
 
 import os
-from threading import Lock
-
 import cv2 as cv
 import numpy as np
-import tensorflow as tf
 import ujson
+import pickle
+import time
 
-from preprocessing.preprocessor import BaseDataSource
+from preprocessing.preprocessor import Preprocessor
 import util.gaze
 import util.heatmap
 
-import pickle
 
-
-class UnityEyes(BaseDataSource):
+class UnityEyes(Preprocessor):
     """UnityEyes data loading class."""
 
     def __init__(self,
-                 tensorflow_session: tf.Session,
-                 batch_size: int,
                  images_path: str,
-                 testing=False,
                  generate_heatmaps=False,
                  eye_image_shape=(36, 60),
                  heatmaps_scale=1.0,
                  **kwargs):
-        """Create queues and threads to read and preprocess data."""
-        self._short_name = 'UnityEyes'
-        if testing:
-            self._short_name += ':test'
 
         # Cache some parameters
         self._eye_image_shape = eye_image_shape
@@ -46,8 +36,6 @@ class UnityEyes(BaseDataSource):
         self._file_stems = sorted([p[:-5] for p in os.listdir(images_path)
                                    if p.endswith('.json')])
         self._num_entries = len(self._file_stems)
-
-        self._mutex = Lock()
         self._current_index = 0
 
         # Define bounds for noise values for different augmentation types
@@ -65,24 +53,12 @@ class UnityEyes(BaseDataSource):
         self._generate_heatmaps = generate_heatmaps
 
         # Call parent class constructor
-        self._tensorflow_session = tensorflow_session
-        super().__init__(tensorflow_session, batch_size=batch_size, testing=testing, **kwargs)
+        super().__init__(**kwargs)
 
     @property
     def num_entries(self):
         """Number of entries in this data source."""
         return self._num_entries
-
-    @property
-    def short_name(self):
-        """Short name specifying source UnityEyes."""
-        return self._short_name
-
-    def reset(self):
-        """Reset index."""
-        with self._mutex:
-            super().reset()
-            self._current_index = 0
 
     def set_difficulty(self, difficulty):
         """Set difficulty of training data."""
@@ -277,43 +253,32 @@ class UnityEyes(BaseDataSource):
             ]).astype(np.float32)
             if self.data_format == 'NHWC':
                 np.transpose(entry['heatmaps'], (1, 2, 0))
-        
-        print('return')
-        print(res)
+
         return res
 
     def preprocess_data(self):
-        try:
-            while True:
-                with self._mutex:
-                    if self._current_index >= self.num_entries:
-                        if self.testing:
-                            break
-                        else:
-                            self._current_index = 0
-                    current_index = self._current_index
-                    self._current_index += 1
+        t = time.time()
+        for current_index in range(self._num_entries):
+            file_stem = self._file_stems[current_index]
+            jpg_path = '%s/%s.jpg' % (self._images_path, file_stem)
+            json_path = '%s/%s.json' % (self._images_path, file_stem)
+            
+            with open(json_path, 'r') as f:
+                json_data = ujson.load(f)
+            
+                entry = {
+                    'full_image': cv.imread(jpg_path, cv.IMREAD_GRAYSCALE),
+                    'json_data': json_data
+                }
 
-                file_stem = self._file_stems[current_index]
-                jpg_path = '%s/%s.jpg' % (self._images_path, file_stem)
-                json_path = '%s/%s.json' % (self._images_path, file_stem)
-
-                with open(json_path, 'r') as f:
-                    json_data = ujson.load(f)
-                
-                    entry = {
-                        'full_image': cv.imread(jpg_path, cv.IMREAD_GRAYSCALE),
-                        'json_data': json_data
-                    }
-
-                    preprocessed_entry = self.preprocess_entry(entry)
-                    if preprocessed_entry is not None:
-                        self._save_pickle(preprocessed_entry, 'preprocessed_data/%s.pickle' % file_stem)
-        finally:
-            # Execute any cleanup operations as necessary
-            pass
-        return data
-
+                preprocessed_entry = self.preprocess_entry(entry)
+                if preprocessed_entry is not None:
+                    self._save_pickle(preprocessed_entry, 'preprocessed_data/%s.pickle' % file_stem)
+            
+            if current_index % 1000 == 0 and current_index != 0:
+                print('preprocessed %s entries in %s' % (current_index, (time.time()-t)))
+                t = time.time()
+    
     def _save_pickle(self, obj, filename):
         with open(filename, 'wb') as handle:
             pickle.dump(obj, handle, protocol=pickle.HIGHEST_PROTOCOL)
