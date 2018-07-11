@@ -22,19 +22,21 @@ class UnityEyes(Preprocessor):
     """UnityEyes data loading class."""
 
     def __init__(self,
-                 images_path: str,
+                 input_path='',
                  generate_heatmaps=False,
                  eye_image_shape=(36, 60),
                  heatmaps_scale=1.0,
                  **kwargs):
+        
+        # Call parent class constructor
+        super().__init__(**kwargs)
 
         # Cache some parameters
         self._eye_image_shape = eye_image_shape
         self._heatmaps_scale = heatmaps_scale
 
         # Create global index over all specified keys
-        self._images_path = images_path
-        self._file_stems = sorted([p[:-5] for p in os.listdir(images_path)
+        self._file_stems = sorted([p[:-5] for p in os.listdir(self._input_path)
                                    if p.endswith('.json')])
         self._num_entries = len(self._file_stems)
         self._current_index = 0
@@ -53,8 +55,6 @@ class UnityEyes(Preprocessor):
         }
         self._generate_heatmaps = generate_heatmaps
 
-        # Call parent class constructor
-        super().__init__(**kwargs)
 
     @property
     def num_entries(self):
@@ -264,8 +264,8 @@ class UnityEyes(Preprocessor):
         t = time.time()
         for current_index in range(self._num_entries):
             file_stem = self._file_stems[current_index]
-            jpg_path = '%s/%s.jpg' % (self._images_path, file_stem)
-            json_path = '%s/%s.json' % (self._images_path, file_stem)
+            jpg_path = '%s/%s.jpg' % (self._input_path, file_stem)
+            json_path = '%s/%s.json' % (self._input_path, file_stem)
             
             with open(json_path, 'r') as f:
                 json_data = ujson.load(f)

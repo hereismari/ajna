@@ -15,10 +15,10 @@ if __name__ == '__main__':
 
     unityeyes = UnityEyes(
         data_format='NCHW',
-        images_path=args.input_path,
         generate_heatmaps=True,
         eye_image_shape=(36, 60),
         heatmaps_scale=1.0,
+        input_path=args.input_path,
         output_path=args.output_path
     )
 
