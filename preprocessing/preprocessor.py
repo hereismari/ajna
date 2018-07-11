@@ -19,10 +19,11 @@ logger = logging.getLogger(__name__)
 
 class Preprocessor(object):
     """Base Preprocessor class."""
-    def __init__(self, data_format='NHWC'):
+    def __init__(self, data_format='NHWC', output_path='pretrained_path/'):
         """Initialize a data source instance."""
         # assert tensorflow_session is not None and isinstance(tensorflow_session, tf.Session)
         self.data_format = data_format.upper()
+        self._output_path = output_path
         assert self.data_format == 'NHWC' or self.data_format == 'NCHW'
 
     def _determine_dtypes_and_shapes(self):

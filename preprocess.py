@@ -1,20 +1,25 @@
 #!/usr/bin/env python3
 """Main script for training a model for gaze estimation."""
-import argparse
 
-import coloredlogs
-import tensorflow as tf
+import argparse
+parser = argparse.ArgumentParser(description='Preprocessing data')
 
 from preprocessing.unityeyes import UnityEyes
 from models.cnn import CNN
 
+parser.add_argument('--output-path', type=str, default='preprocessed_data/', required=True)
+parser.add_argument('--input-path', type=str, default='data/', required=True)
+
 if __name__ == '__main__':
+    args = parser.parse_args()
+
     unityeyes = UnityEyes(
         data_format='NCHW',
-        images_path='datasets',
+        images_path=args.input_path,
         generate_heatmaps=True,
         eye_image_shape=(36, 60),
-        heatmaps_scale=1.0
+        heatmaps_scale=1.0,
+        output_path=args.output_path
     )
 
     unityeyes.set_augmentation_range('translation', 2.0, 10.0)

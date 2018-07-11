@@ -4,6 +4,7 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # ERROR
 import tensorflow as tf
 
+
 def print_progress_bar(count, total, status='', bar_len=50, verbose=True, log_file=None):
     filled_len = int(round(bar_len * count / float(total)))
 
@@ -23,3 +24,8 @@ def print_replace(status):
     ERASE_LINE = '\x1b[2K'
     print('\r%s' % (ERASE_LINE), end = '', flush=True)
     print('\r%s' % (status), end = '', flush=True)
+
+
+def mkdir(folder):
+    if not os.path.exists(folder):
+        os.makedirs(folder)

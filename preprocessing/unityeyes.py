@@ -13,8 +13,9 @@ import pickle
 import time
 
 from preprocessing.preprocessor import Preprocessor
-import util.gaze
-import util.heatmap
+import util.gaze as gaze
+import util.heatmap as heatmap
+import util.util as util
 
 
 class UnityEyes(Preprocessor):
@@ -163,14 +164,14 @@ class UnityEyes(Preprocessor):
         # Convert look vector to gaze direction in polar angles
         look_vec = np.array(eval(json_data['eye_details']['look_vec']))[:3]
         look_vec[0] = -look_vec[0]
-        original_gaze = util.gaze.vector_to_pitchyaw(look_vec.reshape((1, 3))).flatten()
+        original_gaze = gaze.vector_to_pitchyaw(look_vec.reshape((1, 3))).flatten()
         look_vec = rotate_mat * look_vec.reshape(3, 1)
-        gaze = util.gaze.vector_to_pitchyaw(look_vec.reshape((1, 3))).flatten()
-        if gaze[1] > 0.0:
-            gaze[1] = np.pi - gaze[1]
-        elif gaze[1] < 0.0:
-            gaze[1] = -(np.pi + gaze[1])
-        res['gaze'] = gaze.astype(np.float32)
+        _gaze = gaze.vector_to_pitchyaw(look_vec.reshape((1, 3))).flatten()
+        if _gaze[1] > 0.0:
+            _gaze[1] = np.pi - _gaze[1]
+        elif _gaze[1] < 0.0:
+            _gaze[1] = -(np.pi + _gaze[1])
+        res['gaze'] = _gaze.astype(np.float32)
 
         # Draw line randomly
         num_line_noise = int(np.round(noisy_value_from_type('num_line')))
@@ -244,7 +245,7 @@ class UnityEyes(Preprocessor):
         if self._generate_heatmaps:
             # Should be half-scale (compared to eye image)
             res['heatmaps'] = np.asarray([
-                util.heatmap.gaussian_2d(
+                heatmap.gaussian_2d(
                     shape=(self._heatmaps_scale*oh, self._heatmaps_scale*ow),
                     centre=self._heatmaps_scale*landmark,
                     sigma=value_from_type('heatmap_sigma'),
@@ -257,6 +258,9 @@ class UnityEyes(Preprocessor):
         return res
 
     def preprocess_data(self):
+        # mkdir if needed
+        util.mkdir(self._output_path)
+
         t = time.time()
         for current_index in range(self._num_entries):
             file_stem = self._file_stems[current_index]
@@ -273,7 +277,7 @@ class UnityEyes(Preprocessor):
 
                 preprocessed_entry = self.preprocess_entry(entry)
                 if preprocessed_entry is not None:
-                    self._save_pickle(preprocessed_entry, 'preprocessed_data/%s.pickle' % file_stem)
+                    self._save_pickle(preprocessed_entry, os.path.join(self._output_path, '%s.pickle' % file_stem))
             
             if current_index % 1000 == 0 and current_index != 0:
                 print('preprocessed %s entries in %s' % (current_index, (time.time()-t)))
