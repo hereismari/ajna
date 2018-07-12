@@ -1,8 +1,5 @@
-import numpy as np
-import random
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # ERROR
-import tensorflow as tf
+import pickle
 
 
 def print_progress_bar(count, total, status='', bar_len=50, verbose=True, log_file=None):
@@ -29,3 +26,6 @@ def print_replace(status):
 def mkdir(folder):
     if not os.path.exists(folder):
         os.makedirs(folder)
+
+def load_pickle(filename):
+     return pickle.load(open(filename, 'rb'))

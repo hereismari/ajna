@@ -6,8 +6,8 @@ import pickle
 
 class DataSource(object):
     def __init__(self,
-                 train_files,
-                 eval_files,
+                 train_files=None,
+                 eval_files=None,
                  batch_size=32,
                  seed=7,
                  data_format='NHWC'):
@@ -15,14 +15,19 @@ class DataSource(object):
         self.data_format = data_format.upper()
         assert self.data_format == 'NHWC' or self.data_format == 'NCHW'
 
-        self.train = Data(train_files, batch_size=batch_size, data_format=data_format)
-        self.eval = Data(eval_files, batch_size=600, data_format=data_format)
+        if train_files is not None:
+            self.train = Data(train_files, batch_size=batch_size, data_format=data_format)
+       
+        if eval_files is not None:
+            self.eval = Data(eval_files, batch_size=600, data_format=data_format)
 
-        self.iter = tf.data.Iterator.from_structure(self.train._dataset.output_types,
-                                                    self.train._dataset.output_shapes)
+        self.iter = tf.data.Iterator.from_structure(self.eval._dataset.output_types,
+                                                    self.eval._dataset.output_shapes)
         
-        self.train.make_initializer(self.iter)
-        self.eval.make_initializer(self.iter)
+        if train_files is not None:
+            self.train.make_initializer(self.iter)
+        if eval_files is not None:
+            self.eval.make_initializer(self.iter)
 
         self.x_shape = (36, 60)
         self.tensors = self.iter.get_next()

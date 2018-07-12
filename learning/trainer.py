@@ -13,30 +13,29 @@ class Trainer(object):
         self.running_losses = {}
         self.eval_losses = {}
 
-    def run_training(self, data, max_steps, eval=True, test=True, output_path='checkpoints/cnn.cpkt'):
+    def run_training(self, data, max_steps, eval=True, test=True, output_path='checkpoints/cnn.ckpt'):
         self.max_steps = max_steps
-
-        saver = tf.train.Saver()
+        self.saver = tf.train.Saver()
         print('Training')
         with tf.Session() as sess:
             self.initialize_vars(sess)
             self.train(sess,data, eval=eval)
 
             if output_path is not None:
-                saver.save(sess, output_path)
+                self.saver.save(sess, output_path)
                 print('Model saved at %s' % output_path)
 
-    def run_eval(self, eval_data, model_path='checkpoints/cnn.cpkt'):
-        saver = tf.train.Saver()
+    def run_eval(self, eval_data, model_path='checkpoints/cnn.ckpt'):
+        self.saver = tf.train.Saver()
         with tf.Session() as sess:
-            saver.restore(sess, model_path)
+            self.saver.restore(sess, model_path)
             self.eval(sess, eval_data)
     
-    def run_predict(self, eval_data, model_path='checkpoints/cnn.cpkt'):
+    def run_predict(self, eval_data, model_path='checkpoints/cnn.ckpt'):
         saver = tf.train.Saver()
         with tf.Session() as sess:
             saver.restore(sess, model_path)
-            self.predict(self, eval_data)
+            return self.predict(sess, eval_data)
 
 
     def initialize_vars(self, sess):
@@ -50,10 +49,10 @@ class Trainer(object):
     
     def predict(self, sess, data):
         data.eval.run_single(sess)
-        print(self.predict_step(sess, data))
-    
+        return self.predict_step(sess, data)
 
     def eval(self, sess, data):
+        self.saver.save(sess, 'checkpoints/cnn.ckpt')
         self.eval_losses = {}
         self.eval_steps = 0
         data.eval.run_single(sess)

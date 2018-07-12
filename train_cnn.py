@@ -19,6 +19,7 @@ import argparse
 parser = argparse.ArgumentParser(description='Train CNN (Elg).')
 parser.add_argument('--train-path', type=str, default='data/', required=True)
 parser.add_argument('--eval-path', type=str, default='data/', required=True)
+parser.add_argument('--steps', type=int, default=200)
 
 def main(args):
     # Get dataset
@@ -42,7 +43,7 @@ def main(args):
     trainer = Trainer(model)
 
     # Train for 10000 steps
-    return trainer.run_training(datasource, 1000)
+    return trainer.run_training(datasource, args.steps)
 
 
 if __name__ == '__main__':
