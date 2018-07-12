@@ -6,6 +6,30 @@ import pickle
 
 class DataSource(object):
     def __init__(self,
+                 train_files,
+                 eval_files,
+                 batch_size=32,
+                 seed=7,
+                 data_format='NHWC'):
+        self.batch_size = batch_size
+        self.data_format = data_format.upper()
+        assert self.data_format == 'NHWC' or self.data_format == 'NCHW'
+
+        self.train = Data(train_files, batch_size=batch_size, data_format=data_format)
+        self.eval = Data(eval_files, batch_size=600, data_format=data_format)
+
+        self.iter = tf.data.Iterator.from_structure(self.train._dataset.output_types,
+                                                    self.train._dataset.output_shapes)
+        
+        self.train.make_initializer(self.iter)
+        self.eval.make_initializer(self.iter)
+
+        self.x_shape = (36, 60)
+        self.tensors = self.iter.get_next()
+
+
+class Data(object):
+    def __init__(self,
                  files,
                  batch_size=32,
                  seed=7,
@@ -30,14 +54,7 @@ class DataSource(object):
                 .shuffle(10000*self.batch_size, seed=seed) \
                 .repeat().batch(self.batch_size) \
                 .prefetch(2 * self.batch_size)
-
-        self.iter = tf.data.Iterator.from_structure(self._dataset.output_types,
-                                                    self._dataset.output_shapes)
-        self.tensors = self.iter.get_next()
-        self.make_initializer(self.iter)
-
-        self.x_shape = (36, 60)
-    
+        
     def _preprocess_pickle(self, filename):
         data = pickle.load(open(filename, 'rb'))
         return data['eye'], data['heatmaps'], data['landmarks'], data['radius']

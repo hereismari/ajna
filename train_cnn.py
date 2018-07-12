@@ -15,10 +15,16 @@ from learning.trainer import Trainer
 
 import glob
 
-def main():
+import argparse
+parser = argparse.ArgumentParser(description='Train CNN (Elg).')
+parser.add_argument('--train-path', type=str, default='data/', required=True)
+parser.add_argument('--eval-path', type=str, default='data/', required=True)
+
+def main(args):
     # Get dataset
-    files = glob.glob('preprocessed_data/*.pickle')
-    datasource = DataSource(files)
+    train_files = glob.glob(os.path.join(args.train_path, '*.pickle'))
+    eval_files = glob.glob(os.path.join(args.eval_path, '*.pickle'))
+    datasource = DataSource(train_files, eval_files)
 
     # Get model
     learning_schedule=[
@@ -36,8 +42,8 @@ def main():
     trainer = Trainer(model)
 
     # Train for 10000 steps
-    return trainer.run_training(datasource, 10000)
+    return trainer.run_training(datasource, 1000)
 
 
 if __name__ == '__main__':
-    main()
+    main(parser.parse_args())

@@ -35,6 +35,7 @@ class CNN(object):
         self.get_model()
 
 
+
     @staticmethod
     def _tf_mse(x, y):
         """Tensorflow call for mean-squared error."""
@@ -45,14 +46,28 @@ class CNN(object):
         sess.run(self.increase_train_count)
         return sess.run(self.backprop)
     
+    def eval_iteration(self, sess):
+        return sess.run(self.run_eval)
 
     def get_model(self):
         X_pred, losses, metrics = self.build_model()
+        
         self.model = X_pred
         self.losses = losses
         self.metrics = metrics
+
+        # Summaries
+        heatmap_summary = tf.summary.scalar("heatmaps_mse", self.losses['heatmaps_mse'])
+        radius_summary = tf.summary.scalar("radius_mse", self.losses['radius_mse'])
+        self.summaries = tf.summary.merge_all()
+
+        self.train_writer = tf.summary.FileWriter('checkpoints/train')
+        self.eval_writer = tf.summary.FileWriter('checkpoints/test')
+
+
+        self.run_eval = [self.summaries, self.model, self.losses]
         self.build_optimizer()
-    
+
     def define_data(self, data_holder):
         self.X = data_holder[0]
 
@@ -62,7 +77,7 @@ class CNN(object):
     
     def build_optimizer(self):
         self._build_optimizers()
-        self.backprop = self._optimize_ops + [self.losses]
+        self.backprop = [self.summaries] + self._optimize_ops + [self.losses]
     
     def _build_optimizers(self):
         """Based on learning schedule, create optimizer instances."""

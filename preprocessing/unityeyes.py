@@ -22,7 +22,6 @@ class UnityEyes(Preprocessor):
     """UnityEyes data loading class."""
 
     def __init__(self,
-                 input_path='',
                  generate_heatmaps=False,
                  eye_image_shape=(36, 60),
                  heatmaps_scale=1.0,
@@ -88,6 +87,7 @@ class UnityEyes(Preprocessor):
         def process_coords(coords_list):
             coords = [eval(l) for l in coords_list]
             return np.array([(x, ih-y, z) for (x, y, z) in coords])
+
         interior_landmarks = process_coords(json_data['interior_margin_2d'])
         caruncle_landmarks = process_coords(json_data['caruncle_2d'])
         iris_landmarks = process_coords(json_data['iris_2d'])
