@@ -80,7 +80,7 @@ class Trainer(object):
 
     def train_step(self, sess, data, eval=True):
         self.train_batch(sess, data)
-        if eval and (self.step % self.eval_steps == 0) or (self.step + 1 == self.max_steps):
+        if eval and (self.running_steps % self.eval_steps == 0) or (self.running_steps + 1 == self.max_steps):
             self.eval_step_train(sess, data.train)
             self.eval(sess, data)
             data.train.run(sess)
