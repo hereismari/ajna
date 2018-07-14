@@ -9,15 +9,18 @@ from models.cnn import CNN
 
 parser.add_argument('--output-path', type=str, default='preprocessed_data/', required=True)
 parser.add_argument('--input-path', type=str, default='data/', required=True)
+parser.add_argument('--eye-shape', type=int, nargs="+", default=[150, 90])
+parser.add_argument('--heatmap-scale', type=float, default=1)
+parser.add_argument('--data-format', type=str, default='NCHW')
 
 if __name__ == '__main__':
     args = parser.parse_args()
 
     unityeyes = UnityEyes(
-        data_format='NCHW',
+        data_format=args.data_format,
         generate_heatmaps=True,
-        eye_image_shape=(36, 60),
-        heatmaps_scale=1.0,
+        eye_image_shape=tuple(args.eye_shape),
+        heatmaps_scale=args.heatmap_scale,
         input_path=args.input_path,
         output_path=args.output_path
     )
