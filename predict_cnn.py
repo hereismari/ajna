@@ -13,7 +13,7 @@ parser = argparse.ArgumentParser(description='Train CNN (Elg).')
 parser.add_argument('--input-image', type=str, required=True)
 parser.add_argument('--model-checkpoint', type=str, required=True)
 
-parser.add_argument('--eye-shape', type=int, nargs="+", default=[150, 90])
+parser.add_argument('--eye-shape', type=int, nargs="+", default=[90, 60])
 parser.add_argument('--heatmap-scale', type=float, default=1)
 parser.add_argument('--data-format', type=str, default='NCHW')
 
@@ -36,7 +36,7 @@ def main(args):
     model = CNN(datasource.tensors, datasource.x_shape, learning_schedule)
     
     # Get evaluator
-    evaluator = Trainer(model)
+    evaluator = Trainer(model, model_checkpoint=args.model_checkpoint)
 
     # Predict
     output, losses = evaluator.run_predict(datasource)

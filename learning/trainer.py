@@ -5,14 +5,15 @@ import csv
 from util import util
 
 class Trainer(object):
-    def __init__(self, model):
+    def __init__(self, model, model_checkpoint='checkpoints/last_cnn.ckpt'):
         self.model = model
 
-        self.eval_steps = 1000
+        self.eval_steps = 100
         self.exec_name = 'train'
         self.running_losses = {}
         self.eval_losses = {}
         self.best_loss = 100
+        self.model_checkpoint=model_checkpoint
 
     def run_training(self, data, max_steps, eval=True, test=True, output_path='checkpoints/last_cnn.ckpt'):
         self.max_steps = max_steps
@@ -22,20 +23,19 @@ class Trainer(object):
             self.initialize_vars(sess)
             self.train(sess,data, eval=eval)
 
-            if output_path is not None:
-                self.saver.save(sess, output_path)
-                print('Model saved at %s' % output_path)
+            self.saver.save(sess, output_path)
+            print('Model saved at %s' % output_path)
 
-    def run_eval(self, eval_data, model_path='checkpoints/cnn.ckpt'):
+    def run_eval(self, eval_data):
         self.saver = tf.train.Saver()
         with tf.Session() as sess:
-            self.saver.restore(sess, model_path)
+            self.saver.restore(sess, self.model_checkpoint)
             self.eval(sess, eval_data)
     
-    def run_predict(self, eval_data, model_path='checkpoints/cnn.ckpt'):
+    def run_predict(self, eval_data):
         saver = tf.train.Saver()
         with tf.Session() as sess:
-            saver.restore(sess, model_path)
+            saver.restore(sess, self.model_checkpoint)
             return self.predict(sess, eval_data)
 
 

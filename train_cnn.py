@@ -13,9 +13,9 @@ import argparse
 parser = argparse.ArgumentParser(description='Train CNN (Elg).')
 parser.add_argument('--train-path', type=str, default='data/', required=True)
 parser.add_argument('--eval-path', type=str, default='data/', required=True)
-parser.add_argument('--steps', type=int, default=200)
+parser.add_argument('--steps', type=int, default=2000)
 
-parser.add_argument('--eye-shape', type=int, nargs="+", default=[150, 90])
+parser.add_argument('--eye-shape', type=int, nargs="+", default=[90, 60])
 parser.add_argument('--heatmap-scale', type=float, default=1)
 parser.add_argument('--data-format', type=str, default='NCHW')
 

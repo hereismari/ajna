@@ -9,7 +9,7 @@ from models.cnn import CNN
 
 parser.add_argument('--output-path', type=str, default='preprocessed_data/', required=True)
 parser.add_argument('--input-path', type=str, default='data/', required=True)
-parser.add_argument('--eye-shape', type=int, nargs="+", default=[150, 90])
+parser.add_argument('--eye-shape', type=int, nargs="+", default=[90, 60])
 parser.add_argument('--heatmap-scale', type=float, default=1)
 parser.add_argument('--data-format', type=str, default='NCHW')
 
