@@ -12,8 +12,9 @@ class Trainer(object):
         self.exec_name = 'train'
         self.running_losses = {}
         self.eval_losses = {}
+        self.best_loss = 100
 
-    def run_training(self, data, max_steps, eval=True, test=True, output_path='checkpoints/cnn.ckpt'):
+    def run_training(self, data, max_steps, eval=True, test=True, output_path='checkpoints/last_cnn.ckpt'):
         self.max_steps = max_steps
         self.saver = tf.train.Saver()
         print('Training')
@@ -52,7 +53,6 @@ class Trainer(object):
         return self.predict_step(sess, data)
 
     def eval(self, sess, data):
-        self.saver.save(sess, 'checkpoints/cnn.ckpt')
         self.eval_losses = {}
         self.eval_steps = 0
         data.eval.run_single(sess)
@@ -62,7 +62,12 @@ class Trainer(object):
             except tf.errors.OutOfRangeError:
                 s = ''
                 for loss in self.eval_losses:
-                    s += 'Evaluation Loss %s: %g' % (loss, self.eval_losses[loss] / (self.eval_steps * data.batch_size))
+                    avg_loss = self.eval_losses[loss] / self.eval_steps
+                    if loss == 'heatmaps_mse' and avg_loss < self.best_loss:
+                        self.saver.save(sess, 'checkpoints/best_cnn.ckpt')
+                        self.best_loss = avg_loss
+
+                    s += 'Evaluation Loss %s: %g' % (loss, avg_loss)
                     s += '  |  '
                 print(s)
                 break

@@ -22,7 +22,7 @@ class DataSource(object):
                               heatmap_scale=heatmap_scale, shape=shape)
        
         if eval_files is not None:
-            self.eval = Data(eval_files, batch_size=600, data_format=data_format,
+            self.eval = Data(eval_files, batch_size=batch_size, data_format=data_format,
                              heatmap_scale=heatmap_scale, shape=shape)
 
         self.iter = tf.data.Iterator.from_structure(self.eval._dataset.output_types,
