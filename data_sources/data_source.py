@@ -10,16 +10,20 @@ class DataSource(object):
                  eval_files=None,
                  batch_size=32,
                  seed=7,
+                 shape=(150, 90),
+                 heatmap_scale=0.5,
                  data_format='NHWC'):
         self.batch_size = batch_size
         self.data_format = data_format.upper()
         assert self.data_format == 'NHWC' or self.data_format == 'NCHW'
 
         if train_files is not None:
-            self.train = Data(train_files, batch_size=batch_size, data_format=data_format)
+            self.train = Data(train_files, batch_size=batch_size, data_format=data_format,
+                              heatmap_scale=heatmap_scale, shape=shape)
        
         if eval_files is not None:
-            self.eval = Data(eval_files, batch_size=600, data_format=data_format)
+            self.eval = Data(eval_files, batch_size=batch_size, data_format=data_format,
+                             heatmap_scale=heatmap_scale, shape=shape)
 
         self.iter = tf.data.Iterator.from_structure(self.eval._dataset.output_types,
                                                     self.eval._dataset.output_shapes)
@@ -37,6 +41,8 @@ class Data(object):
     def __init__(self,
                  files,
                  batch_size=32,
+                 shape=(150, 90),
+                 heatmap_scale=0.5,
                  seed=7,
                  data_format='NHWC'):
         self.batch_size = batch_size
@@ -48,6 +54,9 @@ class Data(object):
         self.data_format = data_format.upper()
         assert self.data_format == 'NHWC' or self.data_format == 'NCHW'
 
+        self._heatmap_scale = heatmap_scale
+        self._shape = shape
+
         base_dataset = tf.data.Dataset.from_tensor_slices(self._files)
 
         base_dataset = base_dataset.map(lambda filename: tuple(tf.py_func(
@@ -56,7 +65,7 @@ class Data(object):
     
         self._dataset_single = base_dataset.cache().batch(self.batch_size)
         self._dataset = base_dataset.cache() \
-                .shuffle(10000*self.batch_size, seed=seed) \
+                .shuffle(self._num_examples + 100, seed=seed) \
                 .repeat().batch(self.batch_size) \
                 .prefetch(2 * self.batch_size)
         
@@ -65,8 +74,9 @@ class Data(object):
         return data['eye'], data['heatmaps'], data['landmarks'], data['radius']
     
     def _set_shapes(self, eye, heatmaps, landmarks, radius):
-        eye.set_shape([1, 36, 60])
-        heatmaps.set_shape([18, 36, 60])
+        heatmaps_shape = [int(s * self._heatmap_scale) for s in self._shape]
+        eye.set_shape([1] + list(self._shape))
+        heatmaps.set_shape([18] + heatmaps_shape)
         landmarks.set_shape([18, 2])
         radius.set_shape([])
         return eye, heatmaps, landmarks, radius

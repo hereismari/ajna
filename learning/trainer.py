@@ -5,15 +5,17 @@ import csv
 from util import util
 
 class Trainer(object):
-    def __init__(self, model):
+    def __init__(self, model, model_checkpoint='checkpoints/last_cnn.ckpt'):
         self.model = model
 
-        self.eval_steps = 1000
+        self.eval_steps = 100
         self.exec_name = 'train'
         self.running_losses = {}
         self.eval_losses = {}
+        self.best_loss = 100
+        self.model_checkpoint=model_checkpoint
 
-    def run_training(self, data, max_steps, eval=True, test=True, output_path='checkpoints/cnn.ckpt'):
+    def run_training(self, data, max_steps, eval=True, test=True, output_path='checkpoints/last_cnn.ckpt'):
         self.max_steps = max_steps
         self.saver = tf.train.Saver()
         print('Training')
@@ -21,20 +23,19 @@ class Trainer(object):
             self.initialize_vars(sess)
             self.train(sess,data, eval=eval)
 
-            if output_path is not None:
-                self.saver.save(sess, output_path)
-                print('Model saved at %s' % output_path)
+            self.saver.save(sess, output_path)
+            print('Model saved at %s' % output_path)
 
-    def run_eval(self, eval_data, model_path='checkpoints/cnn.ckpt'):
+    def run_eval(self, eval_data):
         self.saver = tf.train.Saver()
         with tf.Session() as sess:
-            self.saver.restore(sess, model_path)
+            self.saver.restore(sess, self.model_checkpoint)
             self.eval(sess, eval_data)
     
-    def run_predict(self, eval_data, model_path='checkpoints/cnn.ckpt'):
+    def run_predict(self, eval_data):
         saver = tf.train.Saver()
         with tf.Session() as sess:
-            saver.restore(sess, model_path)
+            saver.restore(sess, self.model_checkpoint)
             return self.predict(sess, eval_data)
 
 
@@ -52,7 +53,6 @@ class Trainer(object):
         return self.predict_step(sess, data)
 
     def eval(self, sess, data):
-        self.saver.save(sess, 'checkpoints/cnn.ckpt')
         self.eval_losses = {}
         self.eval_steps = 0
         data.eval.run_single(sess)
@@ -62,7 +62,12 @@ class Trainer(object):
             except tf.errors.OutOfRangeError:
                 s = ''
                 for loss in self.eval_losses:
-                    s += 'Evaluation Loss %s: %g' % (loss, self.eval_losses[loss] / (self.eval_steps * data.batch_size))
+                    avg_loss = self.eval_losses[loss] / self.eval_steps
+                    if loss == 'heatmaps_mse' and avg_loss < self.best_loss:
+                        self.saver.save(sess, 'checkpoints/best_cnn.ckpt')
+                        self.best_loss = avg_loss
+
+                    s += 'Evaluation Loss %s: %g' % (loss, avg_loss)
                     s += '  |  '
                 print(s)
                 break
@@ -75,7 +80,7 @@ class Trainer(object):
 
     def train_step(self, sess, data, eval=True):
         self.train_batch(sess, data)
-        if eval and (self.step % self.eval_steps == 0) or (self.step + 1 == self.max_steps):
+        if eval and (self.running_steps % self.eval_steps == 0) or (self.running_steps + 1 == self.max_steps):
             self.eval_step_train(sess, data.train)
             self.eval(sess, data)
             data.train.run(sess)
