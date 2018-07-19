@@ -89,10 +89,10 @@ if __name__=="__main__":
             #left_eye_point1 = (left_eye_bottom_x - definePadding(left_eye_bottom_x), left_eye_bottom_y + definePadding(left_eye_bottom_y, 9))
             #left_eye_point2 = (left_eye_top_x+definePadding(left_eye_top_x), left_eye_top_y-definePadding(left_eye_top_y, 9))
 
-            cv2.rectangle(frame, left_eye_point1, left_eye_point2, (255, 0, 0), 2)
-            cv2.rectangle(frame, right_eye_point1, right_eye_point2, (255, 0, 0), 2)
-
-            crop_img = frame[0:10, 0:10]
+            crop_img = frame[left_eye_point1[1]-60:left_eye_point1[1], left_eye_point2[0]-90:left_eye_point2[0]]
+            crop_img_right = frame[right_eye_point1[1]-60:right_eye_point1[1], right_eye_point2[0]-90:right_eye_point2[0]]
+            #cv2.rectangle(frame, left_eye_point1, left_eye_point2, (255, 0, 0), 2)
+            #cv2.rectangle(frame, right_eye_point1, right_eye_point2, (255, 0, 0), 2)
 
             for (a,b) in landmarks:
                 # Drawing points on face
@@ -105,7 +105,11 @@ if __name__=="__main__":
 
         cv2.imshow("frame", frame)
         cv2.imshow("crop", crop_img)
+        cv2.imshow("crop_right", crop_img_right)
+
 
         #  Stop if 'q' is pressed
         if cv2.waitKey(1) == ord('q'):
             break;
+    video_capture.release()
+    cv2.destroyAllWindows()
