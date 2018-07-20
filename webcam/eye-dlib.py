@@ -18,12 +18,20 @@ def land2coords(landmarks, dtype="int"):
     # return the list of (a, b)-coordinates
     return coords
 
-def definePadding(coordinate, percPadding=6):
-    return int((coordinate * percPadding)/100)
+def defineRectangleCoordinates(bottom_x, bottom_y, top_x, top_y):    
+    padding = 20    
+    
+    w = (top_x + padding) - (bottom_x - padding)
+    h_old = (bottom_y + padding) - bottom_x
+    h_new = (6.0 * w) / 9.0
 
-def defineRectangleCoordinates(bottom_x, bottom_y, top_x, top_y):
-    left_eye_point1 = (bottom_x - definePadding(bottom_x), bottom_y + definePadding(bottom_y, 9))
-    left_eye_point2 = (top_x + definePadding(top_x), top_y - definePadding(top_y, 9))
+    if (h_new >= h_old):
+        top_y_new = top_y - (h_new - h_old)
+    else:
+        top_y_new = top_y + (h_old - h_new)
+
+    left_eye_point1 = (bottom_x - padding, bottom_y + padding)
+    left_eye_point2 = (top_x + padding, top_new)
 
     return (left_eye_point1, left_eye_point2)
 
@@ -85,19 +93,16 @@ if __name__=="__main__":
             right_eye_top_y = landmarks[44][1]
 
             right_eye_point1, right_eye_point2 = defineRectangleCoordinates(right_eye_bottom_x, right_eye_bottom_y, right_eye_top_x, right_eye_top_y)
-
-            #left_eye_point1 = (left_eye_bottom_x - definePadding(left_eye_bottom_x), left_eye_bottom_y + definePadding(left_eye_bottom_y, 9))
-            #left_eye_point2 = (left_eye_top_x+definePadding(left_eye_top_x), left_eye_top_y-definePadding(left_eye_top_y, 9))
-
+            
             crop_img = frame[left_eye_point1[1]-60:left_eye_point1[1], left_eye_point2[0]-90:left_eye_point2[0]]
-            crop_img_right = frame[right_eye_point1[1]-60:right_eye_point1[1], right_eye_point2[0]-90:right_eye_point2[0]]
-            #cv2.rectangle(frame, left_eye_point1, left_eye_point2, (255, 0, 0), 2)
+            #crop_img_right = frame[right_eye_point1[1]-60:right_eye_point1[1], right_eye_point2[0]-90:right_eye_point2[0]]
+            
+            cv2.rectangle(frame, left_eye_point1, left_eye_point2, (255, 0, 0), 2)
             #cv2.rectangle(frame, right_eye_point1, right_eye_point2, (255, 0, 0), 2)
 
             for (a,b) in landmarks:
                 # Drawing points on face
-                cv2.circle(frame, (a, b), 2, (255, 0, 0), -1)
-                #cv2.rectangle(frame, (a, b), (a+w, y+h), (255, 0, 0), 2)
+                cv2.circle(frame, (a, b), 2, (255, 0, 0), -1)                
 
             # Writing face number on image
             cv2.putText(frame, "Face :{}".format(enum + 1), (x - 10, y - 10),
@@ -105,7 +110,7 @@ if __name__=="__main__":
 
         cv2.imshow("frame", frame)
         cv2.imshow("crop", crop_img)
-        cv2.imshow("crop_right", crop_img_right)
+        #cv2.imshow("crop_right", crop_img_right)
 
 
         #  Stop if 'q' is pressed
