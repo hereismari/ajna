@@ -8,7 +8,7 @@ import numpy as np
 from tensorflow.contrib.tensorboard.plugins import projector  # pylint: disable=e0611
 
 class CNN(object):
-    def __init__(self, data_holder, input_shape, learning_schedule):
+    def __init__(self, data_holder, input_shape, learning_schedule, data_format='NCHW'):
         self._training = tf.Variable(True, dtype=tf.bool, trainable=False)
         self._train = tf.assign(self._training, True)
         self._eval = tf.assign(self._training, False)
@@ -25,15 +25,15 @@ class CNN(object):
         self._hg_num_residual_blocks = 1
 
         # NCHW
-        self._data_format_longer = 'channels_first'
-        self._data_format = 'NCHW'
+        self._data_format_longer = 'channels_first' if data_format == 'NCHW' else 'channels_last'
+        print(data_format)
+        self._data_format = data_format
         self.use_batch_statistics = True
         self.is_training = True
 
         self._learning_schedule = learning_schedule
 
         self.get_model()
-
 
 
     @staticmethod

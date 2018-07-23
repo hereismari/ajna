@@ -4,9 +4,26 @@ import imutils
 import numpy as np
 import dlib
 
+import sys
+sys.path.append('../..')
+
+from data_sources.data_source import DataSource
+from data_sources.img_data_source import ImgDataSource
+from models.cnn import CNN
+from learning.trainer import Trainer
+
+import argparse
+parser = argparse.ArgumentParser(description='Webcam')
+
+parser.add_argument('--landmarks', type=str, default='model', choices=['model', 'dlib68'])
+parser.add_argument('--model-checkpoint', type=str, required=True)
+parser.add_argument('--eye-shape', type=int, nargs="+", default=[90, 60])
+parser.add_argument('--heatmap-scale', type=float, default=1)
+parser.add_argument('--data-format', type=str, default='NHWC')
+
+
 # Function for creating landmark coordinate list
 def land2coords(landmarks, dtype="int"):
-
     # initialize the list of tuples
     # (x, y)-coordinates
     coords = np.zeros((68, 2), dtype=dtype)
@@ -19,12 +36,13 @@ def land2coords(landmarks, dtype="int"):
     # return the list of (a, b)-coordinates
     return coords
 
-def defineRectangleCoordinates(bottom_x, bottom_y, top_x, top_y):    
+
+def defineRectangleCoordinates(bottom_x, bottom_y, top_x, top_y, width=6., height=9.):    
     padding = 20    
     
     w = (top_x + padding) - (bottom_x - padding)
     h_old = (bottom_y + padding) - bottom_x
-    h_new = (6.0 * w) / 9.0
+    h_new = (width * w) / height
 
     if (h_new >= h_old):
         top_y_new = top_y - (h_new - h_old)
@@ -37,16 +55,45 @@ def defineRectangleCoordinates(bottom_x, bottom_y, top_x, top_y):
     return (rect_point1, rect_point2)
 
 
+def get_evaluator(args):
+    datasource = DataSource(None, [], shape=tuple(args.eye_shape),
+                            data_format=args.data_format, heatmap_scale=args.heatmap_scale)
+    # Get model
+    learning_schedule=[
+        {
+            'loss_terms_to_optimize': {
+                'heatmaps_mse': ['hourglass'],
+                'radius_mse': ['radius'],
+            },
+            'learning_rate': 1e-3,
+        }
+    ]
+
+    model = CNN(datasource.tensors, datasource.x_shape, learning_schedule, data_format=args.data_format)
+    evaluator = Trainer(model, model_checkpoint=args.model_checkpoint)
+    return evaluator
+
+def predict(evaluator, image):
+    datasource = ImgDataSource(None, image, shape=tuple(args.eye_shape),
+                               data_format=args.data_format, heatmap_scale=args.heatmap_scale)
+    output, losses = evaluator.run_predict(datasource)
+    print('Losses', losses)
+
+
 # main Function
 if __name__=="__main__":
+    args = parser.parse_args()
+
+    evaluator = get_evaluator(args)
+
     # loading dlib's Hog Based face detector
     face_detector = dlib.get_frontal_face_detector()
 
     # loading dlib's 68 points-shape-predictor
     # get file:shape_predictor_68_face_landmarks.dat from
     # link: https://drive.google.com/file/d/1XvAobn_6xeb8Ioa8PBnpCXZm8mgkBTiJ/view?usp=sharing
-    landmark_predictor = dlib.shape_predictor('shape_predictor_68_face_landmarks.dat')
-
+    landmark_predictor = dlib.shape_predictor('webcam/shape_predictor_68_face_landmarks.dat')
+    
     # 0 means your default web cam
     vid = cv2.VideoCapture(0)
 
@@ -68,7 +115,6 @@ if __name__=="__main__":
         face_boundaries = face_detector(frame_gray,0)
 
         for (enum,face) in enumerate(face_boundaries):
-
             # Let's predict and draw landmarks
             landmarks = landmark_predictor(frame_gray, face)
 
@@ -96,6 +142,8 @@ if __name__=="__main__":
             
             crop_left_eye_gray = cv2.cvtColor(crop_left_eye, cv2.COLOR_BGR2GRAY)
             crop_right_eye_gray = cv2.cvtColor(crop_right_eye, cv2.COLOR_BGR2GRAY)
+
+            predict(evaluator, crop_left_eye_gray)
 
             nchannels = 1
             crop_left_eye_gray = np.resize(crop_left_eye_gray, (crop_height, crop_width, nchannels))
