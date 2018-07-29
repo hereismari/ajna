@@ -1,13 +1,13 @@
 # neccessary imports
 import cv2
 import imutils
+import util.util as util
 import numpy as np
 import dlib
 
 import sys
 sys.path.append('../..')
 
-from data_sources.data_source import DataSource
 from data_sources.img_data_source import ImgDataSource
 from models.cnn import CNN
 from learning.trainer import Trainer
@@ -56,8 +56,8 @@ def defineRectangleCoordinates(bottom_x, bottom_y, top_x, top_y, width=6., heigh
 
 
 def get_evaluator(args):
-    datasource = DataSource(None, [], shape=tuple(args.eye_shape),
-                            data_format=args.data_format, heatmap_scale=args.heatmap_scale)
+    datasource = ImgDataSource(shape=tuple(args.eye_shape),
+                               data_format=args.data_format)
     # Get model
     learning_schedule=[
         {
@@ -69,22 +69,23 @@ def get_evaluator(args):
         }
     ]
 
-    model = CNN(datasource.tensors, datasource.x_shape, learning_schedule, data_format=args.data_format)
+    model = CNN(datasource.tensors, datasource.x_shape, learning_schedule, data_format=args.data_format, predict_only=True)
     evaluator = Trainer(model, model_checkpoint=args.model_checkpoint)
-    return evaluator
+    return datasource, evaluator
 
-def predict(evaluator, image):
-    datasource = ImgDataSource(None, image, shape=tuple(args.eye_shape),
-                               data_format=args.data_format, heatmap_scale=args.heatmap_scale)
+def predict(evaluator, image, datasource):
+    datasource.image = image
     output, losses = evaluator.run_predict(datasource)
-    print('Losses', losses)
+    
+    import ipdb; ipdb.set_trace()
+    util.plot_predictions2(output, image)
 
 
 # main Function
 if __name__=="__main__":
     args = parser.parse_args()
 
-    evaluator = get_evaluator(args)
+    datasource, evaluator = get_evaluator(args)
 
     # loading dlib's Hog Based face detector
     face_detector = dlib.get_frontal_face_detector()
@@ -92,7 +93,7 @@ if __name__=="__main__":
     # loading dlib's 68 points-shape-predictor
     # get file:shape_predictor_68_face_landmarks.dat from
     # link: https://drive.google.com/file/d/1XvAobn_6xeb8Ioa8PBnpCXZm8mgkBTiJ/view?usp=sharing
-    landmark_predictor = dlib.shape_predictor('webcam/shape_predictor_68_face_landmarks.dat')
+    landmark_predictor = dlib.shape_predictor('shape_predictor_68_face_landmarks.dat')
     
     # 0 means your default web cam
     vid = cv2.VideoCapture(0)
@@ -143,7 +144,7 @@ if __name__=="__main__":
             crop_left_eye_gray = cv2.cvtColor(crop_left_eye, cv2.COLOR_BGR2GRAY)
             crop_right_eye_gray = cv2.cvtColor(crop_right_eye, cv2.COLOR_BGR2GRAY)
 
-            predict(evaluator, crop_left_eye_gray)
+            predict(evaluator, crop_left_eye_gray, datasource)
 
             nchannels = 1
             crop_left_eye_gray = np.resize(crop_left_eye_gray, (crop_height, crop_width, nchannels))

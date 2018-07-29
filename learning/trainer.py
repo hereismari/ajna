@@ -39,7 +39,7 @@ class Trainer(object):
         if self.session is None:
             self.session = tf.Session()
             self.initialize_vars(self.session)
-            saver.restore(self.session, self.model_checkpoint)    
+            saver.restore(self.session, self.model_checkpoint)
         return self.predict(self.session, eval_data)
 
 
