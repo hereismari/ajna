@@ -42,6 +42,7 @@ def main(args):
     output, losses = evaluator.run_predict(datasource)
     input_data = util.load_pickle(args.input_image)
     print('Losses', losses)
+    import ipdb; ipdb.set_trace()
     util.plot_predictions(output, input_data, tuple(args.eye_shape))
 
 

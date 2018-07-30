@@ -9,6 +9,7 @@ import sys
 sys.path.append('../..')
 
 from data_sources.img_data_source import ImgDataSource
+from preprocessing.img_preprocessor import ImgPreprocessor
 from models.cnn import CNN
 from learning.trainer import Trainer
 
@@ -73,35 +74,37 @@ def get_evaluator(args):
     evaluator = Trainer(model, model_checkpoint=args.model_checkpoint)
     return datasource, evaluator
 
-def predict(evaluator, image, datasource):
-    datasource.image = image
-    output, losses = evaluator.run_predict(datasource)
+def predict(evaluator, image, datasource, preprocessor):
+    preprocessed_image = preprocessor.preprocess_entry(image)
+    datasource.image = preprocessed_image
+    output, _ = evaluator.run_predict(datasource)
     
     import ipdb; ipdb.set_trace()
-    util.plot_predictions2(output, image)
+    util.plot_predictions2(output, preprocessed_image.reshape(90, 60))
 
 
 # main Function
 if __name__=="__main__":
     args = parser.parse_args()
+    shape = (args.eye_shape[1], args.eye_shape[0])
 
     datasource, evaluator = get_evaluator(args)
+    preprocessor = ImgPreprocessor(args.data_format)
 
     # loading dlib's Hog Based face detector
     face_detector = dlib.get_frontal_face_detector()
 
     # loading dlib's 68 points-shape-predictor
     # get file:shape_predictor_68_face_landmarks.dat from
-    # link: https://drive.google.com/file/d/1XvAobn_6xeb8Ioa8PBnpCXZm8mgkBTiJ/view?usp=sharing
+    # link: https://drive.google.com/firun_prele/d/1XvAobn_6xeb8Ioa8PBnpCXZm8mgkBTiJ/view?usp=sharing
     landmark_predictor = dlib.shape_predictor('shape_predictor_68_face_landmarks.dat')
     
     # 0 means your default web cam
     vid = cv2.VideoCapture(0)
 
-    crop_width = 90
-    crop_height = 60
+    crop_height = args.eye_shape[0]
+    crop_width = args.eye_shape[1]
     
-
     while True:
         _,frame = vid.read()
 
@@ -113,9 +116,8 @@ if __name__=="__main__":
         frame_gray = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
 
         # detecting faces
-        face_boundaries = face_detector(frame_gray,0)
-
-        for (enum,face) in enumerate(face_boundaries):
+        face_boundaries = face_detector(frame_gray, 0)
+        for (enum, face) in enumerate(face_boundaries):
             # Let's predict and draw landmarks
             landmarks = landmark_predictor(frame_gray, face)
 
@@ -138,13 +140,18 @@ if __name__=="__main__":
 
             right_eye_point1, right_eye_point2 = defineRectangleCoordinates(right_eye_bottom_x, right_eye_bottom_y, right_eye_top_x, right_eye_top_y)
             
-            crop_left_eye = frame[left_eye_point1[1]-crop_height:left_eye_point1[1], left_eye_point2[0]-crop_width:left_eye_point2[0]]
-            crop_right_eye = frame[right_eye_point1[1]-crop_height:right_eye_point1[1], right_eye_point2[0]-crop_width:right_eye_point2[0]]
+            aux_height = 30
+            aux_width = 20
+            crop_left_eye = frame[left_eye_point1[1]-crop_height:left_eye_point1[1]+aux_height, left_eye_point2[0]-crop_width-aux_width:left_eye_point2[0]+aux_width]
+            crop_right_eye = frame[right_eye_point1[1]-crop_height:right_eye_point1[1]+aux_height, right_eye_point2[0]-crop_width-aux_width:right_eye_point2[0]+width]
             
+            crop_left_eye = cv2.resize(crop_left_eye, shape)
+            crop_right_eye = cv2.resize(crop_right_eye, shape)
+
             crop_left_eye_gray = cv2.cvtColor(crop_left_eye, cv2.COLOR_BGR2GRAY)
             crop_right_eye_gray = cv2.cvtColor(crop_right_eye, cv2.COLOR_BGR2GRAY)
 
-            predict(evaluator, crop_left_eye_gray, datasource)
+            predict(evaluator, crop_right_eye_gray, datasource, preprocessor)
 
             nchannels = 1
             crop_left_eye_gray = np.resize(crop_left_eye_gray, (crop_height, crop_width, nchannels))

@@ -32,4 +32,4 @@ class ImgDataSource(object):
         self.eval = self
 
     def run_single(self, sess):
-        sess.run(self.iter.initializer, feed_dict={self.placeholder_X: self.image.reshape(1, 90, 60, 1)})
+        sess.run(self.iter.initializer, feed_dict={self.placeholder_X: self.image.reshape(*self.shape)})

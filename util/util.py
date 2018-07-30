@@ -72,13 +72,13 @@ def plot_predictions2(output, input_img):
     eye = input_img
     output_landmarks = output['landmarks'].reshape(18, 2)
 
-    fig, ax = plt.subplots(1, 3)
+    fig, ax = plt.subplots(1, 1)
 
     # both in same image
-    img = ax[0].imshow(eye, cmap='gray')
+    img = ax.imshow(eye, cmap='gray')
     for landmark in output_landmarks:
         circ = Circle((landmark[0], landmark[1]), 1, alpha=0.7, color='red')
-        ax[0].add_patch(circ)
-    ax[0].set_title('Predições')
+        ax.add_patch(circ)
+    ax.set_title('Predições')
 
     plt.show(), plt.pause(2)
