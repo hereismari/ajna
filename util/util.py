@@ -70,7 +70,7 @@ def plot_predictions(output, input_data, eye_shape):
 
 def plot_predictions2(output, input_img):
     eye = input_img
-    output_landmarks = output['landmarks'].reshape(18, 2)
+    output_landmarks = output.reshape(18, 2)
 
     fig, ax = plt.subplots(1, 1)
 

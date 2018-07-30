@@ -45,6 +45,9 @@ class CNN(object):
         sess.run(self.increase_train_count)
         return sess.run(self.backprop)
     
+    def run_model(self, sess):
+        return sess.run(self.landmarks)
+
     def eval_iteration(self, sess):
         return sess.run(self.run_eval)
 
@@ -160,7 +163,10 @@ class CNN(object):
                 metrics['landmarks_mse'] = CNN._tf_mse(x, self.Y2)
             else:
                 metrics['landmarks_mse'] = None
+            
             outputs['landmarks'] = x
+
+        self.landmarks = tf.identity(x, name="output")
 
         # Fully-connected layers for radius regression
         with tf.variable_scope('radius'):
