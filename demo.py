@@ -4,7 +4,7 @@ import time
 
 from geometry import Camera, Eye
 from pygame import gfxdraw
-from threading import Thread
+from threading import Thread, Lock
 
 
 pygame.init()
@@ -19,19 +19,28 @@ class Model(Thread):
     def __init__(self):
         Thread.__init__(self)
 
-        self.data = None
+        self.lock = Lock()
+        self.data = []
         self.stop = False
 
     def run(self):
         while not self.stop:
-            self.data = self.run_step()
+            data = self.run_step(), time.time()
+
+            with self.lock:
+                self.data.append(data)
+
+            time.sleep(0.1)
 
     def run_step(self):
         # TODO: get data from model
-        return None, None, time.time()
+        return None, None
 
     def get(self):
-        return self.data
+        with self.lock:
+            result = self.data
+            self.data = []
+        return result
 
 
 class DemoScreen:
@@ -57,16 +66,12 @@ class DemoScreen:
 
     def update(self, delta):
         now = time.time()
-        data = self.model.get()
 
-        if data:
-            eye1, eye2, timestamp = data
-            point = self.camera.estimate(eye1, eye2)
-
+        for eyes, timestamp in self.model.get():
+            point = self.camera.estimate(*eyes)
             self.points.append((point, timestamp))
 
         self.points = [(p, t) for p, t in self.points if t > now - 1]
-
 
         return self
 
@@ -104,8 +109,8 @@ class CalibrationScreen:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 if self.current:
-                    eye1, eye2, timestamp = self.model.run_step()
-                    self.data[self.current[2]].append((eye1, eye2))
+                    eyes = self.model.run_step()
+                    self.data[self.current[2]].append(eyes)
 
                 if self.points:
                     self.current = self.points.pop()
