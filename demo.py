@@ -1,8 +1,10 @@
 import pygame
 import random
+import time
 
 from geometry import Camera, Eye
 from pygame import gfxdraw
+from threading import Thread
 
 
 pygame.init()
@@ -13,27 +15,69 @@ info = pygame.display.Info()
 clock = pygame.time.Clock()
 
 
-class Demo:
-    def __init__(self, camera):
+class Model(Thread):
+    def __init__(self):
+        Thread.__init__(self)
+
+        self.data = None
+        self.stop = False
+
+    def run(self):
+        while not self.stop:
+            self.data = self.run_step()
+
+    def run_step(self):
+        # TODO: get data from model
+        return None, None, time.time()
+
+    def get(self):
+        return self.data
+
+
+class DemoScreen:
+    def __init__(self, camera, model):
         self.camera = camera
-        self.point = (0, 0)
+        self.model = model
+        self.points = []
+
+        self.model.start()
 
     def draw(self, display):
-        gfxdraw.filled_circle(display, self.point[0], self.point[1], 8, (0, 0, 0))
-        gfxdraw.aacircle(display, self.point[0], self.point[1], 8, (0, 0, 0))
+        if self.points:
+            pool = len(self.points)
+
+            x = sum(x for (x, y), t in self.points) / pool
+            y = sum(y for (x, y), t in self.points) / pool
+
+            gfxdraw.filled_circle(display, x, y, 8, (0, 0, 0))
+            gfxdraw.aacircle(display, x, y, 8, (0, 0, 0))
 
     def react(self, event):
         pass
 
     def update(self, delta):
-        # TODO: get data from model
-        self.point = self.camera.estimate(None, None)
+        now = time.time()
+        data = self.model.get()
+
+        if data:
+            eye1, eye2, timestamp = data
+            point = self.camera.estimate(eye1, eye2)
+
+            self.points.append((point, timestamp))
+
+        self.points = [(p, t) for p, t in self.points if t > now - 1]
+
+
         return self
 
+    def clean_up(self):
+        self.model.stop = True
 
-class Calibration:
+
+class CalibrationScreen:
     def __init__(self):
         self.camera = Camera(640, 420, 50)
+        self.model = Model()
 
         self.data = [[], [], [], []]
         self.points = 5 * [
@@ -60,8 +104,8 @@ class Calibration:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 if self.current:
-                    # TODO: store data from model
-                    self.data[self.current[2]].append((None, None))
+                    eye1, eye2, timestamp = self.model.run_step()
+                    self.data[self.current[2]].append((eye1, eye2))
 
                 if self.points:
                     self.current = self.points.pop()
@@ -70,11 +114,13 @@ class Calibration:
                     self.current = None
 
     def update(self, delta):
-        return self if self.current else Demo(self.camera)
+        return self if self.current else DemoScreen(self.camera, self.model)
+
+    def clean_up(self):
+        pass
 
 
-
-screen = Calibration()
+screen = CalibrationScreen()
 
 
 def update(delta):
@@ -97,7 +143,11 @@ def draw():
 
 while screen:
     draw()
-    delta = clock.tick(60)
-    screen = update(delta)
+    delta = clock.tick(30)
+    next = update(delta)
+
+    if next is not screen:
+        screen.clean_up()
+        screen = next
 
 pygame.quit()
