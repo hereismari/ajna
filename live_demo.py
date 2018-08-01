@@ -27,11 +27,17 @@ from learning.trainer import Trainer
 import argparse
 parser = argparse.ArgumentParser(description='Webcam')
 
-parser.add_argument('--landmarks', type=str, default='model', choices=['model', 'dlib68'])
 parser.add_argument('--model-checkpoint', type=str, required=True)
 parser.add_argument('--eye-shape', type=int, nargs="+", default=[90, 60])
 parser.add_argument('--heatmap-scale', type=float, default=1)
 parser.add_argument('--data-format', type=str, default='NHWC')
+parser.add_argument('-src', '--source', dest='video_source', type=int,
+                    default=0, help='Device index of the camera.')
+parser.add_argument('-num-w', '--num-workers', dest='num_workers', type=int,
+                    default=2, help='Number of workers.')
+parser.add_argument('-q-size', '--queue-size', dest='queue_size', type=int,
+                    default=10, help='Size of the queue.')
+args = parser.parse_args()  
 
 
 # Function for creating landmark coordinate list
@@ -66,44 +72,16 @@ def defineRectangleCoordinates(bottom_x, bottom_y, top_x, top_y, width=6., heigh
 
     return (rect_point1, rect_point2)
 
-
-def get_evaluator(args):
-    datasource = ImgDataSource(shape=tuple(args.eye_shape),
-                               data_format=args.data_format)
-    # Get model
-    learning_schedule=[
-        {
-            'loss_terms_to_optimize': {
-                'heatmaps_mse': ['hourglass'],
-                'radius_mse': ['radius'],
-            },
-            'learning_rate': 1e-3,
-        }
-    ]
-
-    model = CNN(datasource.tensors, datasource.x_shape, learning_schedule, data_format=args.data_format, predict_only=True)
-    evaluator = Trainer(model, model_checkpoint=args.model_checkpoint)
-    return datasource, evaluator
-
-def predict(evaluator, image, datasource, preprocessor):
-    preprocessed_image = preprocessor.preprocess_entry(image)
-    datasource.image = preprocessed_image
-    output, _ = evaluator.run_predict(datasource)    
-    import ipdb; ipdb.set_trace()
-    util.plot_predictions2(output, preprocessed_image.reshape(90, 60))
-
-
 def detect_eye_landmarks(image_np, datasource, preprocessor, sess, model):
-    image_np = preprocessor.preprocess_entry(image_np)
-    datasource.image = image_np
-    datasource.eval.run_single(sess)
-    print(image_np)
-    eye_landmarks = model.run_model(sess)
-    print(eye_landmarks)
+    preprocessed_image = preprocessor.preprocess_entry(image_np)
+    datasource.image = preprocessed_image
+    datasource.run_single(sess)
+    model.eval(sess)
+    input_image, eye_landmarks = model.run_model(sess)
+    assert np.all(input_image == preprocessed_image), (input_image, preprocessed_image)
     return eye_landmarks
 
-
-def worker(input_q, output_q):
+def setup():
     # Load a (frozen) Tensorflow model into memory.
     '''
     detection_graph = tf.Graph()
@@ -116,8 +94,8 @@ def worker(input_q, output_q):
 
         sess = tf.Session(graph=detection_graph)
     '''
-    data_format = 'NHWC'
-    shape = (60, 90)
+    data_format = args.data_format
+    shape = tuple(args.eye_shape)
     preprocessor = ImgPreprocessor(data_format)
     datasource = ImgDataSource(shape=shape,
                                data_format=data_format)
@@ -142,50 +120,28 @@ def worker(input_q, output_q):
     init_l = tf.local_variables_initializer()
     sess.run(init)
     sess.run(init_l)
-
-    saver.restore(sess, 'checkpoints/best_cnn.ckpt')
-    model.eval(sess)
-
-    fps = FPS().start()
+    saver.restore(sess, args.model_checkpoint)
     
+    return datasource, preprocessor, sess, model
+
+def worker(input_q, output_q):
+    datasource, preprocessor, sess, model = setup()
     while True:
-        fps.update()
         x = input_q.get()
         output_q.put(detect_eye_landmarks(x, datasource, preprocessor, sess, model))
-
-    fps.stop()
     sess.close()
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-src', '--source', dest='video_source', type=int,
-                        default=0, help='Device index of the camera.')
-    parser.add_argument('-wd', '--width', dest='width', type=int,
-                        default=480, help='Width of the frames in the video stream.')
-    parser.add_argument('-ht', '--height', dest='height', type=int,
-                        default=360, help='Height of the frames in the video stream.')
-    parser.add_argument('-num-w', '--num-workers', dest='num_workers', type=int,
-                        default=2, help='Number of workers.')
-    parser.add_argument('-q-size', '--queue-size', dest='queue_size', type=int,
-                        default=5, help='Size of the queue.')
-    args = parser.parse_args()
-
-
     logger = multiprocessing.log_to_stderr()
     logger.setLevel(multiprocessing.SUBDEBUG)
-
-
-    data_format = 'NHWC'
-    shape = (60, 90)
+    shape = (args.eye_shape[1], args.eye_shape[0])
 
     input_q = Queue(maxsize=args.queue_size)
     output_q = Queue(maxsize=args.queue_size)
     pool = Pool(args.num_workers, worker, (input_q, output_q))
 
-    video_capture = WebcamVideoStream(src=args.video_source,
-                                      width=args.width,
-                                      height=args.height).start()
+    video_capture = WebcamVideoStream(src=args.video_source).start()
     fps = FPS().start()
 
     # loading dlib's Hog Based face detector
@@ -200,11 +156,15 @@ if __name__ == '__main__':
 
     while True:  # fps._numFrames < 120
         frame = video_capture.read()
+        
+        # resizing frame
+        frame = imutils.resize(frame, width=800)
+
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         # grayscale conversion of image because it is computationally efficient
         # to perform operations on single channeled (grayscale) image
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
+        
         # detecting faces
         face_boundaries = face_detector(frame_gray, 0)
         if len(face_boundaries) < 1:
@@ -261,11 +221,8 @@ if __name__ == '__main__':
 
         t = time.time()
 
-        x = output_q.get()
-        print(x)
-
-        util.plot_predictions2(x, graph_input.reshape(90, 60))
-        for (a, b) in x[0]:
+        landmarks = output_q.get()
+        for (a, b) in landmarks.reshape(-1, 2):
             cv2.circle(frame, (a, b), 2, (0, 255, 0), -1)
         print('[INFO] elapsed time: {:.2f}'.format(time.time() - t))
 

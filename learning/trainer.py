@@ -13,7 +13,7 @@ class Trainer(object):
         self.running_losses = {}
         self.eval_losses = {}
         self.best_loss = 100
-        self.model_checkpoint=model_checkpoint
+        self.model_checkpoint = model_checkpoint
         self.session = None
 
     def run_training(self, data, max_steps, eval=True, test=True, output_path='checkpoints/last_cnn.ckpt'):
@@ -41,6 +41,20 @@ class Trainer(object):
             self.initialize_vars(self.session)
             saver.restore(self.session, self.model_checkpoint)
         return self.predict(self.session, eval_data)
+
+    def run_model(self, eval_data):
+        saver = tf.train.Saver()
+        if self.session is None:
+            self.session = tf.Session()
+            self.initialize_vars(self.session)
+            saver.restore(self.session, self.model_checkpoint)
+        return self._run_model(self.session, eval_data)
+    
+    def _run_model(self, sess, data):
+        data.eval.run_single(sess)
+        self.model.eval(sess)
+        input_img, landmarks = self.model.run_model(sess)
+        return input_img, landmarks
 
 
     def initialize_vars(self, sess):

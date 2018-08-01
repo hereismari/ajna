@@ -46,7 +46,7 @@ class CNN(object):
         return sess.run(self.backprop)
     
     def run_model(self, sess):
-        return sess.run(self.landmarks)
+        return sess.run([self.X, self.landmarks])
 
     def eval_iteration(self, sess):
         return sess.run(self.run_eval)
@@ -154,6 +154,7 @@ class CNN(object):
 
         # Soft-argmax
         x = self._calculate_landmarks(x)
+        self.landmarks = x
 
         with tf.variable_scope('upscale'):
             # Upscale since heatmaps are half-scale of original image
@@ -165,8 +166,6 @@ class CNN(object):
                 metrics['landmarks_mse'] = None
             
             outputs['landmarks'] = x
-
-        self.landmarks = tf.identity(x, name="output")
 
         # Fully-connected layers for radius regression
         with tf.variable_scope('radius'):
