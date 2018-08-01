@@ -25,16 +25,16 @@ class Model(Thread):
 
     def run(self):
         while not self.stop:
-            data = self.run_step(), time.time()
+            data = self.run_step()
+            now = time.time()
 
-            with self.lock:
-                self.data.append(data)
-
-            time.sleep(0.1)
+            if data:
+                with self.lock:
+                    self.data.append((data, now))
 
     def run_step(self):
         # TODO: get data from model
-        return None, None
+        return None
 
     def get(self):
         with self.lock:
@@ -75,7 +75,7 @@ class DemoScreen:
 
         return self
 
-    def clean_up(self):
+    def dispose(self):
         self.model.stop = True
 
 
@@ -108,20 +108,24 @@ class CalibrationScreen:
     def react(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
-                if self.current:
-                    eyes = self.model.run_step()
-                    self.data[self.current[2]].append(eyes)
+                eyes = self.model.run_step()
+                quadrant = self.current[2]
 
-                if self.points:
-                    self.current = self.points.pop()
-                else:
-                    self.camera.calibrate(info.current_w, info.current_h, *self.data)
-                    self.current = None
+                if eyes is not None:
+                    self.data[quadrant].append(eyes)
+
+                    if self.points:
+                        self.current = self.points.pop()
+                    else:
+                        self.camera.calibrate(info.current_w, info.current_h, * self.data)
+                        self.current = None
 
     def update(self, delta):
-        return self if self.current else DemoScreen(self.camera, self.model)
+        if self.current is None:
+            return DemoScreen(self.camera, self.model)
+        return self
 
-    def clean_up(self):
+    def dispose(self):
         pass
 
 
@@ -152,7 +156,7 @@ while screen:
     next = update(delta)
 
     if next is not screen:
-        screen.clean_up()
+        screen.dispose()
         screen = next
 
 pygame.quit()
