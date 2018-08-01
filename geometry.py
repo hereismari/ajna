@@ -1,3 +1,5 @@
+# coding: utf-8
+
 import math
 
 from sympy import Point, Line, Plane
