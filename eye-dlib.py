@@ -233,10 +233,10 @@ if __name__ == '__main__':
 
         right_eye_point1, right_eye_point2 = defineRectangleCoordinates(right_eye_bottom_x, right_eye_bottom_y, right_eye_top_x, right_eye_top_y)
         
-        aux_height = 30
-        aux_width = 20
+        aux_height = 0
+        aux_width = 0
         crop_left_eye = frame[left_eye_point1[1]-crop_height:left_eye_point1[1]+aux_height, left_eye_point2[0]-crop_width-aux_width:left_eye_point2[0]+aux_width]
-        crop_right_eye = frame[right_eye_point1[1]-crop_height:right_eye_point1[1]+aux_height, right_eye_point2[0]-crop_width-aux_width:right_eye_point2[0]+aux_width]
+        crop_right_eye = frame[right_eye_point1[1]-crop_height+20:right_eye_point1[1]+aux_height+20, right_eye_point2[0]-crop_width-aux_width:right_eye_point2[0]+aux_width]
         
         crop_left_eye = cv2.resize(crop_left_eye, shape)
         crop_right_eye = cv2.resize(crop_right_eye, shape)
