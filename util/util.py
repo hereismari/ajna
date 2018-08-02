@@ -82,7 +82,6 @@ def plot_predictions2(output, input_img):
     for landmark in output_landmarks:
         circ = Circle((landmark[0], landmark[1]), 1, alpha=0.7, color='red')
         ax.add_patch(circ)
-    ax.set_title('Predições')
 
     plt.show(), plt.pause(2)
 

@@ -74,11 +74,12 @@ def defineRectangleCoordinates(bottom_x, bottom_y, top_x, top_y, width=6., heigh
 
     return (rect_point1, rect_point2)
 
-def get_inv_landmark_transform(landmarks, frame_gray):
+def get_eye_info(landmarks, frame_gray):
     # Segment eyes
     oh, ow = tuple(args.eye_shape)
+    eyes = []
     # for corner1, corner2, is_left in [(2, 3, True), (0, 1, False)]:
-    for corner1, corner2, is_left in [(42, 45, False)]: # (36, 39, True), 
+    for corner1, corner2, is_left in [(36, 39, True), (42, 45, False)]: 
         x1, y1 = landmarks[corner1, :]
         x2, y2 = landmarks[corner2, :]
         eye_width = 1.5 * np.linalg.norm(landmarks[corner1, :] - landmarks[corner2, :])
@@ -122,17 +123,125 @@ def get_inv_landmark_transform(landmarks, frame_gray):
         inv_transform_mat = (inv_translate_mat * inv_rotate_mat * inv_scale_mat *
                                 inv_centre_mat)
         eye_image = cv2.warpAffine(frame_gray, transform_mat[:2, :], (ow, oh))
+        
         if is_left:
             eye_image = np.fliplr(eye_image)
-        '''
+        
         eyes.append({
             'image': eye_image,
             'inv_landmarks_transform_mat': inv_transform_mat,
             'side': 'left' if is_left else 'right',
         })
-        '''
-        return inv_transform_mat
+    return eyes
 
+def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks, eye_radius, face, frame_rgb):
+    # Gaze estimation
+    heatmaps_amax = np.amax(heatmaps.reshape(-1, 18), axis=0)
+    can_use_eye = np.all(heatmaps_amax > 0.7)
+    can_use_eyelid = np.all(heatmaps_amax[0:8] > 0.75)
+    can_use_iris = np.all(heatmaps_amax[8:16] > 0.8)
+    bgr = frame_rgb
+    # bgr = cv2.flip(bgr, flipCode=1)
+    eye_image = eye['image']
+    eye_side = eye['side']
+    #eye_landmarks = landmarks
+    #eye_radius = radius
+    if eye_side == 'left':
+        eye_landmarks[:, 0] = eye_image.shape[1] - eye_landmarks[:, 0]
+        eye_image = np.fliplr(eye_image)
+
+    # Embed eye image and annotate for picture-in-picture
+    eye_upscale = 2
+    eye_image_raw = cv2.cvtColor(cv2.equalizeHist(eye_image), cv2.COLOR_GRAY2BGR)
+    eye_image_raw = cv2.resize(eye_image_raw, (0, 0), fx=eye_upscale, fy=eye_upscale)
+    eye_image_annotated = np.copy(eye_image_raw)
+
+    if can_use_eyelid:
+        cv2.polylines(
+            eye_image_annotated,
+            [np.round(eye_upscale*eye_landmarks[0:8]).astype(np.int32)
+                                                        .reshape(-1, 1, 2)],
+            isClosed=True, color=(255, 255, 0), thickness=1, lineType=cv2.LINE_AA,
+        )
+    if can_use_iris:
+        cv2.polylines(
+            eye_image_annotated,
+            [np.round(eye_upscale*eye_landmarks[8:16]).astype(np.int32)
+                                                        .reshape(-1, 1, 2)],
+            isClosed=True, color=(0, 255, 255), thickness=1, lineType=cv2.LINE_AA,
+        )
+        cv2.drawMarker(
+            eye_image_annotated,
+            tuple(np.round(eye_upscale*eye_landmarks[16, :]).astype(np.int32)),
+            color=(0, 255, 255), markerType=cv2.MARKER_CROSS, markerSize=4,
+            thickness=1, line_type=cv2.LINE_AA,
+        )
+
+        # face_index = int(eye_index / 2)
+        face_index = 0
+        eh, ew, _ = eye_image_raw.shape
+        v0 = face_index * 2 * eh
+        v1 = v0 + eh
+        v2 = v1 + eh
+        u0 = 0 if eye_side == 'left' else ew
+        u1 = u0 + ew
+        bgr[v0:v1, u0:u1] = eye_image_raw
+        bgr[v1:v2, u0:u1] = eye_image_annotated
+
+        # Visualize preprocessing results
+        frame_landmarks = landmarks
+        for landmark in frame_landmarks[:-1]:
+            cv2.drawMarker(bgr, tuple(np.round(landmark).astype(np.int32)),
+                            color=(0, 0, 255), markerType=cv2.MARKER_STAR,
+                            markerSize=2, thickness=1, line_type=cv2.LINE_AA)
+            cv2.rectangle(
+                bgr, tuple(np.round(face[:2]).astype(np.int32)),
+                tuple(np.round(face[2:]).astype(np.int32)),
+                color=(0, 255, 255), thickness=1, lineType=cv2.LINE_AA,
+            )
+
+        eye_landmarks = np.concatenate([eye_landmarks, [[eye_landmarks[-1, 0] + eye_radius, eye_landmarks[-1, 1]]]])
+        eye_landmarks = np.asmatrix(np.pad(eye_landmarks, ((0, 0), (0, 1)),
+                                            'constant', constant_values=1.0))
+        eye_landmarks = (eye_landmarks *
+                            eye['inv_landmarks_transform_mat'].T)[:, :2]
+        eye_landmarks = np.asarray(eye_landmarks)
+        eyelid_landmarks = eye_landmarks[0:8, :]
+        iris_landmarks = eye_landmarks[8:16, :]
+        iris_centre = eye_landmarks[16, :]
+        eyeball_centre = eye_landmarks[17, :]
+        eyeball_radius = np.linalg.norm(eye_landmarks[18, :] -
+                                        eye_landmarks[17, :])
+
+        if can_use_eye:
+            # Visualize landmarks
+            cv2.drawMarker(  # Eyeball centre
+                bgr, tuple(np.round(eyeball_centre.astype(np.float32)).astype(np.int32)),
+                color=(0, 255, 0),
+                markerType=cv2.MARKER_CROSS, markerSize=4,
+                thickness=1, line_type=cv2.LINE_AA,
+            )
+
+            i_x0, i_y0 = iris_centre
+            e_x0, e_y0 = eyeball_centre
+            theta = -np.arcsin(np.clip((i_y0 - e_y0) / eyeball_radius, -1.0, 1.0))
+            phi = np.arcsin(np.clip((i_x0 - e_x0) / (eyeball_radius * -np.cos(theta)),
+                                    -1.0, 1.0))
+            current_gaze = np.array([theta, phi])
+            gaze_history.append(current_gaze)
+            gaze_history_max_len = 10
+            if len(gaze_history) > gaze_history_max_len:
+                gaze_history = gaze_history[-gaze_history_max_len:]
+            print('Gaze')
+            print(current_gaze)
+            util.draw_gaze(bgr, iris_centre, np.mean(gaze_history, axis=0),
+                            length=120.0, thickness=1)    
+
+            return bgr, gaze_history, current_gaze
+        else:
+            return bgr, gaze_history, None
+    else:
+        return bgr, gaze_history, None
 
 def detect_eye_landmarks(image_np, datasource, preprocessor, sess, model):
     preprocessed_image = preprocessor.preprocess_entry(image_np)
@@ -222,175 +331,23 @@ if __name__ == '__main__':
 
         # converting co-ordinates to NumPy array
         landmarks = land2coords(landmarks)
-        left_eye_bottom_x = landmarks[36][0]
-        left_eye_bottom_y = landmarks[41][1]
-
-        left_eye_top_x = landmarks[39][0]
-        left_eye_top_y = landmarks[38][1]
-
-        left_eye_point1, left_eye_point2 = defineRectangleCoordinates(left_eye_bottom_x, left_eye_bottom_y, left_eye_top_x, left_eye_top_y)
-
-        right_eye_bottom_x = landmarks[42][0]
-        right_eye_bottom_y = landmarks[45][1]
-
-        right_eye_top_x = landmarks[45][0]
-        right_eye_top_y = landmarks[44][1]
-
-        right_eye_point1, right_eye_point2 = defineRectangleCoordinates(right_eye_bottom_x, right_eye_bottom_y, right_eye_top_x, right_eye_top_y)
-        
-        aux_height = 30
-        aux_width = 20
-        crop_left_eye = frame[left_eye_point1[1]-crop_height:left_eye_point1[1]+aux_height, left_eye_point2[0]-crop_width-aux_width:left_eye_point2[0]+aux_width]
-        crop_right_eye = frame[right_eye_point1[1]-crop_height:right_eye_point1[1]+aux_height, right_eye_point2[0]-crop_width-aux_width:right_eye_point2[0]+aux_width]
-        
-        crop_left_eye = cv2.resize(crop_left_eye, shape)
-        crop_right_eye = cv2.resize(crop_right_eye, shape)
-
-        crop_left_eye_gray = cv2.cvtColor(crop_left_eye, cv2.COLOR_BGR2GRAY)
-        crop_right_eye_gray = cv2.cvtColor(crop_right_eye, cv2.COLOR_BGR2GRAY)
-
-        graph_input = crop_right_eye_gray
-        input_q.put(graph_input)
-
-        # detect_eye_landmarks(crop_right_eye_gray, datasource, preprocessor, sess, model)
-        nchannels = 1
-        crop_left_eye_gray = np.resize(crop_left_eye_gray, (crop_height, crop_width, nchannels))
-        crop_right_eye_gray = np.resize(crop_right_eye_gray, (crop_height, crop_width, nchannels))
-
-        frame[0:crop_left_eye.shape[0], 0:crop_left_eye.shape[1]] = crop_left_eye_gray
-        frame[0:crop_right_eye.shape[0], crop_width+2:crop_width+2+crop_right_eye.shape[1]] = crop_right_eye_gray
-
         for (a,b) in landmarks:
             # Drawing points on face
             cv2.circle(frame, (a, b), 2, (255, 0, 0), -1)
 
         t = time.time()
 
-        eye_landmarks, heatmaps, eye_radius = output_q.get()
-        eye_landmarks = eye_landmarks.reshape(18, 2)
-        for (a, b) in landmarks.reshape(-1, 2):
-            cv2.circle(frame, (a, b), 2, (0, 255, 0), -1)
-        
-        
-        heatmaps_amax = np.amax(heatmaps.reshape(-1, 18), axis=0)
-        can_use_eye = np.all(heatmaps_amax > 0.7)
-        can_use_eyelid = np.all(heatmaps_amax[0:8] > 0.75)
-        can_use_iris = np.all(heatmaps_amax[8:16] > 0.8)
-        # eye_index = output['eye_index'][j]
-        bgr = frame_rgb
-        # bgr = cv2.flip(bgr, flipCode=1)
-        eye_image = graph_input
-        eye_side = 'right'
-        #eye_landmarks = landmarks
-        #eye_radius = radius
-        if eye_side == 'left':
-            eye_landmarks[:, 0] = eye_image.shape[1] - eye_landmarks[:, 0]
-            eye_image = np.fliplr(eye_image)
-
-        # Embed eye image and annotate for picture-in-picture
-        eye_upscale = 2
-        eye_image_raw = cv2.cvtColor(cv2.equalizeHist(eye_image), cv2.COLOR_GRAY2BGR)
-        eye_image_raw = cv2.resize(eye_image_raw, (0, 0), fx=eye_upscale, fy=eye_upscale)
-        eye_image_annotated = np.copy(eye_image_raw)
-
-        print(eye_landmarks.shape)
-        print(eye_landmarks)
-        if can_use_eyelid:
-            cv2.polylines(
-                eye_image_annotated,
-                [np.round(eye_upscale*eye_landmarks[0:8]).astype(np.int32)
-                                                            .reshape(-1, 1, 2)],
-                isClosed=True, color=(255, 255, 0), thickness=1, lineType=cv2.LINE_AA,
-            )
-        if can_use_iris:
-            cv2.polylines(
-                eye_image_annotated,
-                [np.round(eye_upscale*eye_landmarks[8:16]).astype(np.int32)
-                                                            .reshape(-1, 1, 2)],
-                isClosed=True, color=(0, 255, 255), thickness=1, lineType=cv2.LINE_AA,
-            )
-            cv2.drawMarker(
-                eye_image_annotated,
-                tuple(np.round(eye_upscale*eye_landmarks[16, :]).astype(np.int32)),
-                color=(0, 255, 255), markerType=cv2.MARKER_CROSS, markerSize=4,
-                thickness=1, line_type=cv2.LINE_AA,
-            )
-
-            # face_index = int(eye_index / 2)
-            face_index = 0
-            eh, ew, _ = eye_image_raw.shape
-            v0 = face_index * 2 * eh
-            v1 = v0 + eh
-            v2 = v1 + eh
-            u0 = 0 if eye_side == 'left' else ew
-            u1 = u0 + ew
-            bgr[v0:v1, u0:u1] = eye_image_raw
-            bgr[v1:v2, u0:u1] = eye_image_annotated
-
-            face = (face.left(), face.top(), face.right(), face.bottom())
-
-            # Visualize preprocessing results
-            frame_landmarks = landmarks
-            for landmark in frame_landmarks[:-1]:
-                cv2.drawMarker(bgr, tuple(np.round(landmark).astype(np.int32)),
-                                color=(0, 0, 255), markerType=cv2.MARKER_STAR,
-                                markerSize=2, thickness=1, line_type=cv2.LINE_AA)
-                cv2.rectangle(
-                    bgr, tuple(np.round(face[:2]).astype(np.int32)),
-                    tuple(np.round(face[2:]).astype(np.int32)),
-                    color=(0, 255, 255), thickness=1, lineType=cv2.LINE_AA,
-                )
-
-            eye_landmarks = np.concatenate([eye_landmarks, [[eye_landmarks[-1, 0] + eye_radius, eye_landmarks[-1, 1]]]])
-            eye_landmarks = np.asmatrix(np.pad(eye_landmarks, ((0, 0), (0, 1)),
-                                                'constant', constant_values=1.0))
-            print(eye_landmarks.shape)
-            eye_landmarks = (eye_landmarks *
-                                get_inv_landmark_transform(landmarks, frame_gray).T)[:, :2]
-            print(eye_landmarks.shape)
-            eye_landmarks = np.asarray(eye_landmarks)
-            eyelid_landmarks = eye_landmarks[0:8, :]
-            iris_landmarks = eye_landmarks[8:16, :]
-            iris_centre = eye_landmarks[16, :]
-            eyeball_centre = eye_landmarks[17, :]
-            eyeball_radius = np.linalg.norm(eye_landmarks[18, :] -
-                                            eye_landmarks[17, :])
-
-            print(eyeball_centre, type(eyeball_centre[0]))
-            print(iris_centre)
-            if can_use_eye:
-                # Visualize landmarks
-                #cv2.drawMarker(  # Eyeball centre
-                #    bgr, tuple(np.round(eyeball_centre.astype(np.float32)).astype(np.int32)),
-                #    color=(0, 255, 0),
-                    # markerType=cv2.MARKER_CROSS, markerSize=4,
-                    #thickness=1, line_type=cv2.LINE_AA,
-                #)
-                # cv2.circle(  # Eyeball outline
-                #     bgr, tuple(np.round(eyeball_centre).astype(np.int32)),
-                #     int(np.round(eyeball_radius)), color=(0, 255, 0),
-                #     thickness=1, lineType=cv2.LINE_AA,
-                # )
-
-                # Draw "gaze"
-                # from models.hg_gaze import estimate_gaze_from_landmarks
-                # current_gaze = estimate_gaze_from_landmarks(
-                #     iris_landmarks, iris_centre, eyeball_centre, eyeball_radius)
-                i_x0, i_y0 = iris_centre
-                e_x0, e_y0 = eyeball_centre
-                theta = -np.arcsin(np.clip((i_y0 - e_y0) / eyeball_radius, -1.0, 1.0))
-                phi = np.arcsin(np.clip((i_x0 - e_x0) / (eyeball_radius * -np.cos(theta)),
-                                        -1.0, 1.0))
-                current_gaze = np.array([theta, phi])
-                gaze_history.append(current_gaze)
-                gaze_history_max_len = 10
-                if len(gaze_history) > gaze_history_max_len:
-                    gaze_history = gaze_history[-gaze_history_max_len:]
-                print('Gaze')
-                print(current_gaze)
-                util.draw_gaze(bgr, iris_centre, np.mean(gaze_history, axis=0),
-                               length=120.0, thickness=1)       
-        
+        eyes = get_eye_info(landmarks, frame_gray)
+        face = (face.left(), face.top(), face.right(), face.bottom())
+        for eye in eyes:
+            input_q.put(eye['image'])
+            eye_landmarks, heatmaps, eye_radius = output_q.get()
+            eye_landmarks = eye_landmarks.reshape(18, 2)
+            bgr, gaze_history, gaze = estimate_gaze(gaze_history, eye, heatmaps, landmarks, eye_landmarks, eye_radius, face, frame_rgb)
+            
+            for (a, b) in landmarks.reshape(-1, 2):
+                cv2.circle(frame, (a, b), 2, (0, 255, 0), -1)
+ 
         print('[INFO] elapsed time: {:.2f}'.format(time.time() - t))
         cv2.imshow("frame", bgr)
         if cv2.waitKey(1) & 0xFF == ord('q'):
