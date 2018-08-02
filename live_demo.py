@@ -57,23 +57,6 @@ def land2coords(landmarks, dtype="int"):
     return coords
 
 
-def defineRectangleCoordinates(bottom_x, bottom_y, top_x, top_y, width=6., height=9.):    
-    padding = 20    
-    
-    w = (top_x + padding) - (bottom_x - padding)
-    h_old = (bottom_y + padding) - bottom_x
-    h_new = (width * w) / height
-
-    if (h_new >= h_old):
-        top_y_new = top_y - (h_new - h_old)
-    else:
-        top_y_new = top_y + (h_old - h_new)
-
-    rect_point1 = (bottom_x - padding, bottom_y + padding)
-    rect_point2 = (top_x + padding, int(top_y_new))
-
-    return (rect_point1, rect_point2)
-
 def get_eye_info(landmarks, frame_gray):
     # Segment eyes
     oh, ow = tuple(args.eye_shape)
@@ -133,6 +116,7 @@ def get_eye_info(landmarks, frame_gray):
             'side': 'left' if is_left else 'right',
         })
     return eyes
+
 
 def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks, eye_radius, face, frame_rgb):
     # Gaze estimation
@@ -217,7 +201,7 @@ def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks, ey
             # Visualize landmarks
             cv2.drawMarker(  # Eyeball centre
                 bgr, tuple(np.round(eyeball_centre.astype(np.float32)).astype(np.int32)),
-                color=(0, 255, 0),
+                color=(255, 0, 0),
                 markerType=cv2.MARKER_CROSS, markerSize=4,
                 thickness=1, line_type=cv2.LINE_AA,
             )
@@ -232,8 +216,6 @@ def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks, ey
             gaze_history_max_len = 10
             if len(gaze_history) > gaze_history_max_len:
                 gaze_history = gaze_history[-gaze_history_max_len:]
-            print('Gaze')
-            print(current_gaze)
             util.draw_gaze(bgr, iris_centre, np.mean(gaze_history, axis=0),
                             length=120.0, thickness=1)    
 
@@ -243,6 +225,7 @@ def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks, ey
     else:
         return bgr, gaze_history, None
 
+
 def detect_eye_landmarks(image_np, datasource, preprocessor, sess, model):
     preprocessed_image = preprocessor.preprocess_entry(image_np)
     datasource.image = preprocessed_image
@@ -251,6 +234,7 @@ def detect_eye_landmarks(image_np, datasource, preprocessor, sess, model):
     input_image, eye_landmarks, eye_heatmaps, eye_radius = model.run_model(sess)
     assert np.all(input_image == preprocessed_image), (input_image, preprocessed_image)
     return eye_landmarks, eye_heatmaps, eye_radius
+
 
 def setup():
     # Load a Tensorflow model into memory.
@@ -278,6 +262,7 @@ def setup():
     
     return datasource, preprocessor, sess, model
 
+
 def worker(input_q, output_q):
     datasource, preprocessor, sess, model = setup()
     while True:
@@ -287,14 +272,14 @@ def worker(input_q, output_q):
 
 
 if __name__ == '__main__':
-    logger = multiprocessing.log_to_stderr()
-    logger.setLevel(multiprocessing.SUBDEBUG)
     shape = (args.eye_shape[1], args.eye_shape[0])
 
+    # Queue used to iteract with the model
     input_q = Queue(maxsize=args.queue_size)
     output_q = Queue(maxsize=args.queue_size)
     pool = Pool(args.num_workers, worker, (input_q, output_q))
 
+    # Start video capture
     video_capture = WebcamVideoStream(src=args.video_source).start()
     fps = FPS().start()
 
@@ -305,12 +290,10 @@ if __name__ == '__main__':
     # link: https://drive.google.com/firun_prele/d/1XvAobn_6xeb8Ioa8PBnpCXZm8mgkBTiJ/view?usp=sharing
     landmark_predictor = dlib.shape_predictor(args.model_crop_eyes)
 
-    crop_height = 90
-    crop_width = 60
     gaze_history = []
-
     while True:  # fps._numFrames < 120
         frame = video_capture.read()
+        t = time.time()
         
         # resizing frame
         frame = imutils.resize(frame, width=800)
@@ -322,20 +305,16 @@ if __name__ == '__main__':
         
         # detecting faces
         face_boundaries = face_detector(frame_gray, 0)
+        # if there's no face do nothing
         if len(face_boundaries) < 1:
             continue
+        
         face = face_boundaries[0]
         # for face in face_boundaries:
-        # Let's predict and draw landmarks
+        # Let's predict the landmarks
         landmarks = landmark_predictor(frame_gray, face)
-
         # converting co-ordinates to NumPy array
         landmarks = land2coords(landmarks)
-        for (a,b) in landmarks:
-            # Drawing points on face
-            cv2.circle(frame, (a, b), 2, (255, 0, 0), -1)
-
-        t = time.time()
 
         eyes = get_eye_info(landmarks, frame_gray)
         face = (face.left(), face.top(), face.right(), face.bottom())
@@ -343,7 +322,7 @@ if __name__ == '__main__':
             input_q.put(eye['image'])
             eye_landmarks, heatmaps, eye_radius = output_q.get()
             eye_landmarks = eye_landmarks.reshape(18, 2)
-            bgr, gaze_history, gaze = estimate_gaze(gaze_history, eye, heatmaps, landmarks, eye_landmarks, eye_radius, face, frame_rgb)
+            bgr, gaze_history, gaze = estimate_gaze(gaze_history, eye, heatmaps, landmarks, eye_landmarks, eye_radius, face, frame)
             
             for (a, b) in landmarks.reshape(-1, 2):
                 cv2.circle(frame, (a, b), 2, (0, 255, 0), -1)
