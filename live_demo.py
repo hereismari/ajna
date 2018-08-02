@@ -278,7 +278,7 @@ if __name__ == '__main__':
         can_use_iris = np.all(heatmaps_amax[8:16] > 0.8)
         # eye_index = output['eye_index'][j]
         bgr = frame_rgb
-        bgr = cv2.flip(bgr, flipCode=1)
+        # bgr = cv2.flip(bgr, flipCode=1)
         eye_image = graph_input
         eye_side = 'right'
         #eye_landmarks = landmarks
@@ -337,7 +337,7 @@ if __name__ == '__main__':
                                 markerSize=2, thickness=1, line_type=cv2.LINE_AA)
                 cv2.rectangle(
                     bgr, tuple(np.round(face[:2]).astype(np.int32)),
-                    tuple(np.round(np.add(face[:2], face[2:])).astype(np.int32)),
+                    tuple(np.round(face[2:]).astype(np.int32)),
                     color=(0, 255, 255), thickness=1, lineType=cv2.LINE_AA,
                 )
 
