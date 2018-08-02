@@ -75,8 +75,12 @@ class Data(object):
     
     def _set_shapes(self, eye, heatmaps, landmarks, radius):
         heatmaps_shape = [int(s * self._heatmap_scale) for s in self._shape]
-        eye.set_shape([1] + list(self._shape))
-        heatmaps.set_shape([18] + heatmaps_shape)
+        if self.data_format == 'NHWC':
+            eye.set_shape(list(self._shape) + [1])
+            heatmaps.set_shape(heatmaps_shape + [18])
+        else:
+            eye.set_shape([1] + list(self._shape))
+            heatmaps.set_shape([18] + heatmaps_shape)
         landmarks.set_shape([18, 2])
         radius.set_shape([])
         return eye, heatmaps, landmarks, radius

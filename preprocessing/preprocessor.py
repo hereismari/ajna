@@ -4,19 +4,6 @@ Modified by: @mari-linhares
 
 Default specification of a data source.
 """
-
-from collections import OrderedDict
-import multiprocessing
-import queue
-import threading
-import time
-
-import tensorflow as tf
-
-import logging
-logger = logging.getLogger(__name__)
-
-
 class Preprocessor(object):
     """Base Preprocessor class."""
     def __init__(self, data_format='NHWC', output_path='pretrained_path/', input_path='datasets'):

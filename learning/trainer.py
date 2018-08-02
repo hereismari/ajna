@@ -13,12 +13,14 @@ class Trainer(object):
         self.running_losses = {}
         self.eval_losses = {}
         self.best_loss = 100
-        self.model_checkpoint=model_checkpoint
+        self.model_checkpoint = model_checkpoint
+        self.session = None
 
     def run_training(self, data, max_steps, eval=True, test=True, output_path='checkpoints/last_cnn.ckpt'):
         self.max_steps = max_steps
         self.saver = tf.train.Saver()
         print('Training')
+
         with tf.Session() as sess:
             self.initialize_vars(sess)
             self.train(sess,data, eval=eval)
@@ -34,9 +36,25 @@ class Trainer(object):
     
     def run_predict(self, eval_data):
         saver = tf.train.Saver()
-        with tf.Session() as sess:
-            saver.restore(sess, self.model_checkpoint)
-            return self.predict(sess, eval_data)
+        if self.session is None:
+            self.session = tf.Session()
+            self.initialize_vars(self.session)
+            saver.restore(self.session, self.model_checkpoint)
+        return self.predict(self.session, eval_data)
+
+    def run_model(self, eval_data):
+        saver = tf.train.Saver()
+        if self.session is None:
+            self.session = tf.Session()
+            self.initialize_vars(self.session)
+            saver.restore(self.session, self.model_checkpoint)
+        return self._run_model(self.session, eval_data)
+    
+    def _run_model(self, sess, data):
+        data.eval.run_single(sess)
+        self.model.eval(sess)
+        input_img, landmarks = self.model.run_model(sess)
+        return input_img, landmarks
 
 
     def initialize_vars(self, sess):
