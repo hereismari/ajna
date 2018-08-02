@@ -4,6 +4,9 @@ import pickle
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 
+import cv2
+import numpy as np
+
 
 def print_progress_bar(count, total, status='', bar_len=50, verbose=True, log_file=None):
     filled_len = int(round(bar_len * count / float(total)))
@@ -82,3 +85,17 @@ def plot_predictions2(output, input_img):
     ax.set_title('Predições')
 
     plt.show(), plt.pause(2)
+
+
+
+def draw_gaze(image_in, eye_pos, pitchyaw, length=40.0, thickness=2, color=(0, 0, 255)):
+    """Draw gaze angle on given image with a given eye positions."""
+    image_out = image_in
+    if len(image_out.shape) == 2 or image_out.shape[2] == 1:
+        image_out = cv2.cvtColor(image_out, cv2.COLOR_GRAY2BGR)
+    dx = -length * np.sin(pitchyaw[1])
+    dy = -length * np.sin(pitchyaw[0])
+    cv2.arrowedLine(image_out, tuple(np.round(eye_pos.astype(np.float32)).astype(np.int32)),
+                   tuple(np.round([eye_pos[0] + dx, eye_pos[1] + dy]).astype(int)), color,
+                   thickness, cv2.LINE_AA, tipLength=0.2)
+    return image_out

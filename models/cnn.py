@@ -46,7 +46,7 @@ class CNN(object):
         return sess.run(self.backprop)
     
     def run_model(self, sess):
-        return sess.run([self.X, self.landmarks])
+        return sess.run([self.X, self.landmarks, self.heatmaps, self.radius])
 
     def eval_iteration(self, sess):
         return sess.run(self.run_eval)
@@ -151,6 +151,7 @@ class CNN(object):
                 loss_terms['heatmaps_mse'] = None
             x = h
             outputs['heatmaps'] = x
+            self.heatmaps = x
 
         # Soft-argmax
         x = self._calculate_landmarks(x)
@@ -183,6 +184,8 @@ class CNN(object):
             else:
                 metrics['radius_mse'] = None
                 loss_terms['radius_mse'] = None
+
+        self.radius = x
         
         # Define outputs
         return outputs, loss_terms, metrics
