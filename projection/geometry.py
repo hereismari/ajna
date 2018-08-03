@@ -2,7 +2,7 @@
 
 import math
 
-from sympy import Point, Line, Plane
+from sympy import Point, Line, Plane, Rational
 
 
 zero = Point(dim=2)
@@ -71,7 +71,7 @@ class Camera:
     # Traça uma reta da camera até o ponto no monitor para onde se está olhando
     def estimate(self, eye1, eye2):
         point1 = self.to_3D(eye1.coordinates)
-        point2 = self.to_3D(eye2.coordinates) * eye1.radius / eye2.radius
+        point2 = self.to_3D(eye2.coordinates) * Rational(eye1.radius / eye2.radius)
 
         normal = cross(eye1.gaze, eye2.gaze)
 
@@ -81,8 +81,13 @@ class Camera:
         line1 = Line(point1, direction_ratio=eye1.gaze)
         line2 = Line(point2, direction_ratio=eye2.gaze)
 
-        target1, = plane1.projection_line(line2).intersection(line1)
-        target2, = plane2.projection_line(line1).intersection(line2)
+        plane1_line1 = plane1.projection_line(line1)
+        plane1_line2 = plane1.projection_line(line2)
+        plane2_line1 = plane2.projection_line(line1)
+        plane2_line2 = plane2.projection_line(line2)
+
+        target1, = plane1_line1.intersection(plane1_line2)
+        target2, = plane2_line1.intersection(plane2_line2)
 
         return self.to_2D(target1 + target2) / 2
 
@@ -99,33 +104,3 @@ class Camera:
     def to_3D(self, point):
         x, y = point
         return self.zero + Point(x, 0, y)
-
-
-camera = Camera(1920, 1080, 90)
-
-eye1 = Eye((950, 540), 1, (20.00001, -10, 20))
-eye2 = Eye((970, 540), 1, (0.00001, -10, 20))
-
-top_left = ((eye1, eye2),)
-
-eye1 = Eye((950, 540), 1, (0, -10, 10))
-eye2 = Eye((970, 540), 1, (-20, -10, 10))
-
-top_right = ((eye1, eye2),)
-
-eye1 = Eye((950, 540), 1, (20, -10, -20))
-eye2 = Eye((970, 540), 1, (0, -10, -20))
-
-bottom_left = ((eye1, eye2),)
-
-eye1 = Eye((950, 540), 1, (0, -10, -10))
-eye2 = Eye((970, 540), 1, (-20, -10, -10))
-
-bottom_right = ((eye1, eye2),)
-
-camera.calibrate(1920, 1080, top_left, top_right, bottom_left, bottom_right)
-
-eye1 = Eye((950, 540), 1, (10, -10, 0))
-eye2 = Eye((970, 540), 1, (-10, -10, 0))
-
-camera.projection(eye1, eye2)
