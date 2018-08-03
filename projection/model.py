@@ -14,13 +14,16 @@ from data_sources.img_data_source import ImgDataSource
 from preprocessing.img_preprocessor import ImgPreprocessor
 from models.cnn import CNN
 
+import util.util as util
+from webcam.webcam_stream import WebcamVideoStream
+
 
 class Model:
     def __init__(self, args):
         self.args = args
 
         # Start video capture
-        self.video_capture = cv2.VideoCapture(args.video_source)
+        self.video_capture = WebcamVideoStream(0).start()
 
         # loading dlib's Hog Based face detector
         self.face_detector = dlib.get_frontal_face_detector()
@@ -30,6 +33,8 @@ class Model:
         self.landmark_predictor = dlib.shape_predictor(args.model_crop_eyes)
 
         self.datasource, self.preprocessor, self.sess, self.model = self.setup()
+        self.gaze_history = []
+        self.gaze_history_max_len = 10
 
 
     # Function for creating landmark coordinate list
@@ -110,6 +115,7 @@ class Model:
 
     def estimate_gaze(self, eye, heatmaps, face_landmarks, eye_landmarks, eye_radius, face, frame_rgb):
         # Gaze estimation
+        landmarks = face_landmarks
         heatmaps_amax = np.amax(heatmaps.reshape(-1, 18), axis=0)
         can_use_eye = np.all(heatmaps_amax > 0.7)
         can_use_eyelid = np.all(heatmaps_amax[0:8] > 0.75)
@@ -130,7 +136,27 @@ class Model:
         eye_image_raw = cv2.resize(eye_image_raw, (0, 0), fx=eye_upscale, fy=eye_upscale)
         eye_image_annotated = np.copy(eye_image_raw)
 
+        if can_use_eyelid:
+            cv2.polylines(
+                eye_image_annotated,
+                [np.round(eye_upscale*eye_landmarks[0:8]).astype(np.int32)
+                                                            .reshape(-1, 1, 2)],
+                isClosed=True, color=(255, 255, 0), thickness=1, lineType=cv2.LINE_AA,
+            )
         if can_use_iris:
+            cv2.polylines(
+                eye_image_annotated,
+                [np.round(eye_upscale*eye_landmarks[8:16]).astype(np.int32)
+                                                            .reshape(-1, 1, 2)],
+                isClosed=True, color=(0, 255, 255), thickness=1, lineType=cv2.LINE_AA,
+            )
+            cv2.drawMarker(
+                eye_image_annotated,
+                tuple(np.round(eye_upscale*eye_landmarks[16, :]).astype(np.int32)),
+                color=(0, 255, 255), markerType=cv2.MARKER_CROSS, markerSize=4,
+                thickness=1, line_type=cv2.LINE_AA,
+            )
+
             # face_index = int(eye_index / 2)
             face_index = 0
             eh, ew, _ = eye_image_raw.shape
@@ -139,6 +165,20 @@ class Model:
             v2 = v1 + eh
             u0 = 0 if eye_side == 'left' else ew
             u1 = u0 + ew
+            bgr[v0:v1, u0:u1] = eye_image_raw
+            bgr[v1:v2, u0:u1] = eye_image_annotated
+
+            # Visualize preprocessing results
+            frame_landmarks = landmarks
+            for landmark in frame_landmarks[:-1]:
+                cv2.drawMarker(bgr, tuple(np.round(landmark).astype(np.int32)),
+                                color=(0, 0, 255), markerType=cv2.MARKER_STAR,
+                                markerSize=2, thickness=1, line_type=cv2.LINE_AA)
+                cv2.rectangle(
+                    bgr, tuple(np.round(face[:2]).astype(np.int32)),
+                    tuple(np.round(face[2:]).astype(np.int32)),
+                    color=(0, 255, 255), thickness=1, lineType=cv2.LINE_AA,
+                )
 
             eye_landmarks = np.concatenate([eye_landmarks, [[eye_landmarks[-1, 0] + eye_radius, eye_landmarks[-1, 1]]]])
             eye_landmarks = np.asmatrix(np.pad(eye_landmarks, ((0, 0), (0, 1)),
@@ -154,14 +194,27 @@ class Model:
                                             eye_landmarks[17, :])
 
             if can_use_eye:
+                # Visualize landmarks
+                cv2.drawMarker(  # Eyeball centre
+                    bgr, tuple(np.round(eyeball_centre.astype(np.float32)).astype(np.int32)),
+                    color=(255, 0, 0),
+                    markerType=cv2.MARKER_CROSS, markerSize=4,
+                    thickness=1, line_type=cv2.LINE_AA,
+                )
+
                 i_x0, i_y0 = iris_centre
                 e_x0, e_y0 = eyeball_centre
                 theta = -np.arcsin(np.clip((i_y0 - e_y0) / eyeball_radius, -1.0, 1.0))
                 phi = np.arcsin(np.clip((i_x0 - e_x0) / (eyeball_radius * -np.cos(theta)),
                                         -1.0, 1.0))
-                current_gaze = theta[0, 0], phi[0, 0]
-
-                return bgr, (current_gaze, eyeball_centre, eyeball_radius)
+                current_gaze = np.array([theta, phi])  
+                self.gaze_history.append(current_gaze)
+                if len(self.gaze_history) > self.gaze_history_max_len:
+                    self.gaze_history = self.gaze_history[-self.gaze_history_max_len:]
+                
+                util.draw_gaze(bgr, iris_centre, np.mean(self.gaze_history, axis=0),
+                               length=60.0, thickness=1)    
+                return bgr, ((theta[0, 0], phi[0, 0]), eyeball_centre, eyeball_radius)
             else:
                 return bgr, None
         else:
@@ -208,8 +261,7 @@ class Model:
     def run(self):
         result = []
 
-        grabbed, frame = self.video_capture.read()
-        t = time.time()
+        frame = self.video_capture.read()
 
         # resizing frame
         frame = imutils.resize(frame, width=800)
@@ -240,12 +292,8 @@ class Model:
             bgr, gaze_info = self.estimate_gaze(eye, heatmaps, landmarks, eye_landmarks, eye_radius, face, frame)
             result.append(gaze_info)
 
-        return result
+        return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB), result
 
 
     def close(self):
         cv2.destroyAllWindows()
-
-
-    # def resolution(self):
-    #     return self.video_capture.get(cv2.CV_CAP_PROP_FRAME_WIDTH), self.video_capture.get(cv2.CV_CAP_PROP_FRAME_HEIGTH)

@@ -14,7 +14,7 @@ import multiprocessing
 import tensorflow as tf
 
 from webcam.fps import FPS
-from webcam.webcam import WebcamVideoStream
+from webcam.webcam_stream import WebcamVideoStream
 from multiprocessing import Queue, Pool
 
 NUM_CLASSES = 90

@@ -9,6 +9,8 @@ from geometry import Camera, Eye
 from pygame import gfxdraw
 from threading import Thread, Lock
 
+import cv2
+
 
 parser = argparse.ArgumentParser(description='Webcam')
 
@@ -32,19 +34,61 @@ class Worker(Thread):
         self.lock = Lock()
 
     def run_step(self):
-        data = self.model.run()
+        frame, data = self.model.run()
 
-        if sum(1 for d in data if d is not None) == 2:
-            return [Eye(tuple(map(float, coordinates)), float(radius[0][0]), (-math.sin(phi), -1, math.sin(theta))) for (theta, phi), coordinates, radius in data]
+        if data is not None:
+            if sum(1 for d in data) == 2:
+                return frame, [Eye(tuple(map(float, coordinates)), float(radius[0][0]), (-math.sin(phi), -1, math.sin(theta))) for (theta, phi), coordinates, radius in data]
 
     def dispose(self):
         self.model.close()
 
 
-class DemoScreen:
+class Screen(object):
+    def __init__(self, camera=None, worker=None):
+        if camera is None:
+            self.camera = Camera(640, 420, 50)
+        else:
+            self.camera = camera
+        
+        if worker is None:
+            self.worker = Worker()
+        else:
+            self.worker = worker
+
+        self.frame = None
+
+    def display_point(self, display, x, y):
+        gfxdraw.filled_circle(display, int(x), int(y), 8, (255, 0, 0))
+        gfxdraw.aacircle(display, int(x), int(y), 8, (0, 0, 0))
+
+    def react(self, event):
+        pass
+    
+    def update(self, delta):
+        pass
+    
+    def dispose(self):
+        self.worker.dispose()
+    
+    def draw(self, display):
+        if self.frame is not None:
+            rows = 300
+            cols = 300
+
+            # Resize and rotate frame
+            frame = cv2.resize(self.frame, (rows, cols))
+            M = cv2.getRotationMatrix2D((cols/2,rows/2), 90, 1)
+            frame = cv2.warpAffine(frame, M, (cols,rows))
+
+            # Display frame
+            surf = pygame.surfarray.make_surface(frame)
+            display.blit(surf, (0, 0))
+
+
+class DemoScreen(Screen):
     def __init__(self, camera, worker):
-        self.camera = camera
-        self.worker = worker
+        super().__init__(camera, worker)
         self.point = None
 
     def draw(self, display):
@@ -54,26 +98,19 @@ class DemoScreen:
             x = min(max(0, x), info.current_w)
             y = min(max(0, y), info.current_h)
 
-            gfxdraw.filled_circle(display, int(x), int(y), 8, (0, 0, 0))
-            gfxdraw.aacircle(display, int(x), int(y), 8, (0, 0, 0))
-
-    def react(self, event):
-        pass
+            self.display_point(display, x, y)
+        
+        super().draw(display)
 
     def update(self, delta):
-        eyes = self.worker.run_step()
+        self.frame, eyes = self.worker.run_step()
         self.point = self.camera.projection(*eyes) if eyes else None
-
         return self
 
-    def dispose(self):
-        self.worker.dispose()
 
-
-class CalibrationScreen:
+class CalibrationScreen(Screen):
     def __init__(self):
-        self.worker = Worker()
-        self.camera = Camera(640, 420, 50)
+        super().__init__()
 
         self.data = [[], [], [], []]
         self.points = 1 * [
@@ -83,24 +120,29 @@ class CalibrationScreen:
             (info.current_w * 3 / 4, info.current_h * 3 / 4, 3),
         ]
 
+        self.total_points = len(self.points)
+        self.point_counter = 1
+
         random.shuffle(self.points)
         self.current = self.points.pop()
 
     def draw(self, display):
         font = pygame.font.Font(None, 72)
-        surface = font.render('%d/20' % (20 - len(self.points)), True, (0, 0, 0))
-
+        surface = font.render('%d/%d' % (self.point_counter, self.total_points), True, (0, 0, 0))
         display.blit(surface, (info.current_w / 2 - surface.get_width() / 2, info.current_h / 2 - surface.get_height() / 2))
+        surface = font.render('Olhe para o ponto e aperte espaço', True, (0, 0, 0))
+        display.blit(surface, (info.current_w / 2 - surface.get_width() / 2, info.current_h / 2 - surface.get_height() / 2 + 50))
 
         if self.current:
             x, y, q = self.current
-            gfxdraw.filled_circle(display, int(x), int(y), 8, (0, 0, 0))
-            gfxdraw.aacircle(display, int(x), int(y), 8, (0, 0, 0))
+            self.display_point(display, x, y)
+
+        super().draw(display)
 
     def react(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
-                eyes = self.worker.run_step()
+                self.frame, eyes = self.worker.run_step()
                 quadrant = self.current[2]
 
                 if eyes is not None:
@@ -108,8 +150,9 @@ class CalibrationScreen:
 
                     if self.points:
                         self.current = self.points.pop()
+                        self.point_counter += 1
                     else:
-                        self.camera.calibrate(info.current_w, info.current_h, * self.data)
+                        self.camera.calibrate(info.current_w, info.current_h, *self.data)
                         self.current = None
 
     def update(self, delta):
@@ -143,7 +186,7 @@ if __name__ == '__main__':
     pygame.init()
     pygame.display.set_caption('Ajna')
 
-    display = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+    display = pygame.display.set_mode((0, 0))
     info = pygame.display.Info()
     clock = pygame.time.Clock()
 
@@ -151,7 +194,7 @@ if __name__ == '__main__':
 
     while screen:
         draw()
-        delta = clock.tick(10)
+        delta = clock.tick(1)
         next = update(delta)
 
         if next is not screen:
