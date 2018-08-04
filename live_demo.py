@@ -281,8 +281,7 @@ def distance_to_camera(knownWidth, focalLength, perWidth):
 # in this case is 60 cm
 KNOWN_DISTANCE = 60.0
 
-# initialize the known eye width, which in this case, the piece of
-# paper is 2.5 cm
+# initialize the known eye width, which in this case is in average 2.5 cm
 KNOWN_WIDTH = 2.5
 
 def get_focal_length(landmarks, KNOWN_DISTANCE, KNOWN_WIDTH):
@@ -359,8 +358,7 @@ if __name__ == '__main__':
         eye_width = math.hypot(x2 - x1, y2 - y1)
 
         distance = distance_to_camera(KNOWN_WIDTH, focal_length, eye_width)
-
-        cv2.putText(frame, "%.2f cm" % (distance), (frame.shape[1] - 200, frame.shape[0] - 20),cv2.FONT_HERSHEY_SIMPLEX, 1.0, (10, 186, 181), 2)
+        cv2.putText(frame, "%.2f cm" % (distance), (frame.shape[1] - 200, frame.shape[0] - 20),cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 2)
 
         eyes = get_eye_info(landmarks, frame_gray)
         face = (face.left(), face.top(), face.right(), face.bottom())
