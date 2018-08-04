@@ -6,8 +6,13 @@ import pygame
 import random
 pygame.init()
 
-screen = pygame.display.set_mode((640, 480))
+# Recupera info da resolucao do monitor
+info_monitor = pygame.display.Info()
 
+# Define altura e largura da tela de interface
+height = info_monitor.current_h / 2
+width = info_monitor.current_w  / 2
+screen = pygame.display.set_mode((width, height))
 
 class Circle(pygame.sprite.Sprite):
     def __init__(self):
@@ -24,7 +29,7 @@ class Circle(pygame.sprite.Sprite):
 class Target(pygame.sprite.Sprite):
     def __init__(self, pos):
         pygame.sprite.Sprite.__init__(self)
-        self.image = pygame.Surface([20, 20])
+        self.image = pygame.Surface([40, 40])
         self.image.fill((255, 0, 0))
         self.rect = self.image.get_rect()
         self.rect.center = pos
@@ -36,8 +41,9 @@ class Target(pygame.sprite.Sprite):
 def main():
     pygame.display.set_caption("Ajna")
 
+    BACKGROUND_COLOR = (255, 255, 255)
     background = pygame.Surface(screen.get_size())
-    background.fill((255, 255, 255))
+    background.fill(BACKGROUND_COLOR)
     screen.blit(background, (0, 0))
 
     player = Circle()
@@ -51,25 +57,29 @@ def main():
     keepGoing = True
     
     while keepGoing:
-        clock.tick(30)
+        clock.tick(30)        
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 keepGoing = False
+            elif event.type == pygame.KEYDOWN:
+               if event.key == pygame.K_ESCAPE:
+                   keepGoing = False
 
         player_group.clear(screen, background)
         player_group.update()
         player_group.draw(screen)
+
+        target_group.draw(screen)
         
         hit = pygame.sprite.spritecollide(player, target_group, False)
 
-        if hit:
-            print("hitou toda!")
-            x = random.randint(100, 400)              
-            y = random.randint(100, 400)                          
+        if hit:                        
+            x = random.randint(0, width - 50)              
+            y = random.randint(0, height - 50)      
+            target_group.clear(screen, background)            
             target_group.update((x, y))            
-
-        target_group.draw(screen)
-
+        
         pygame.display.flip()
 
     # return mouse
