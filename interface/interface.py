@@ -52,10 +52,10 @@ def main():
     target = Target([100, 200])
     target_group = pygame.sprite.Group()
     target_group.add(target)
-    
+
     clock = pygame.time.Clock()
     keepGoing = True
-    
+
     while keepGoing:
         clock.tick(30)        
 
@@ -84,6 +84,7 @@ def main():
 
     # return mouse
     pygame.mouse.set_visible(True)
+
 
 if __name__ == "__main__":
     main()
