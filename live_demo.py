@@ -138,14 +138,15 @@ def _limit_mouse(pos_x, pos_y):
     return pos_x, pos_y
 
 
-def move_mouse(x, y, threshold_x=0.8, threshold_y=0.8):
+def move_mouse(x, y):
     global old_iris, IRIS_X, IRIS_Y
     
-    # print(x, y)
-    if abs(y) > threshold_y:
+    print(x, y)
+
+    if y > 0.5 or y < -0.5:
         IRIS_Y -= 80 * y
-    
-    if abs(x) > threshold_x:
+
+    if x > 0.6 or x < -0.1:
         IRIS_X -= 100 * x
 
     IRIS_X, IRIS_Y = _limit_mouse(IRIS_X, IRIS_Y)
