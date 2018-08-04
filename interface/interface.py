@@ -10,9 +10,10 @@ pygame.init()
 info_monitor = pygame.display.Info()
 
 # Define altura e largura da tela de interface
-height = info_monitor.current_h / 2
-width = info_monitor.current_w  / 2
+height = int(info_monitor.current_h / 2)
+width = int(info_monitor.current_w / 2)
 screen = pygame.display.set_mode((width, height))
+
 
 class Circle(pygame.sprite.Sprite):
     def __init__(self):
@@ -57,29 +58,29 @@ def main():
     keepGoing = True
 
     while keepGoing:
-        clock.tick(30)        
+        clock.tick(30)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 keepGoing = False
             elif event.type == pygame.KEYDOWN:
-               if event.key == pygame.K_ESCAPE:
-                   keepGoing = False
+                if event.key == pygame.K_ESCAPE:
+                    keepGoing = False
 
         player_group.clear(screen, background)
         player_group.update()
         player_group.draw(screen)
 
         target_group.draw(screen)
-        
+
         hit = pygame.sprite.spritecollide(player, target_group, False)
 
-        if hit:                        
-            x = random.randint(0, width - 50)              
-            y = random.randint(0, height - 50)      
-            target_group.clear(screen, background)            
-            target_group.update((x, y))            
-        
+        if hit:
+            x = random.randint(0, width - 50)
+            y = random.randint(0, height - 50)
+            target_group.clear(screen, background)
+            target_group.update((x, y))
+
         pygame.display.flip()
 
     # return mouse
