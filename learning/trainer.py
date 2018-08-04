@@ -12,8 +12,9 @@ class Trainer(object):
         self.exec_name = 'train'
         self.running_losses = {}
         self.eval_losses = {}
-        self.best_loss = 100
+        self.best_loss = 100  # INF
         self.model_checkpoint=model_checkpoint
+        self.running_loss, self.running_steps = 0, 0
 
     def run_training(self, data, max_steps, eval=True, test=True, output_path='checkpoints/last_cnn.ckpt'):
         self.max_steps = max_steps
@@ -40,8 +41,6 @@ class Trainer(object):
 
 
     def initialize_vars(self, sess):
-        self.running_loss, self.running_steps = 0, 0
-
         init = tf.global_variables_initializer()
         init_l = tf.local_variables_initializer()
 
