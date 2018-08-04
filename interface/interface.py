@@ -46,10 +46,10 @@ def main():
     target = Target([100, 200])
     target_group = pygame.sprite.Group()
     target_group.add(target)
-    
+
     clock = pygame.time.Clock()
     keepGoing = True
-    
+
     while keepGoing:
         clock.tick(30)
         for event in pygame.event.get():
@@ -59,21 +59,20 @@ def main():
         player_group.clear(screen, background)
         player_group.update()
         player_group.draw(screen)
-        
+        target_group.draw(screen)
+
         hit = pygame.sprite.spritecollide(player, target_group, False)
 
         if hit:
-            print("hitou toda!")
-            x = random.randint(100, 400)              
-            y = random.randint(100, 400)                          
-            target_group.update((x, y))            
-
-        target_group.draw(screen)
+            x = random.randint(100, 400)
+            y = random.randint(100, 400)
+            target_group.update((x, y))
 
         pygame.display.flip()
 
     # return mouse
     pygame.mouse.set_visible(True)
+
 
 if __name__ == "__main__":
     main()
