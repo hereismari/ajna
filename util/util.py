@@ -80,8 +80,6 @@ def get_basename(filepath):
 
 def plot_predictions(output, input_data, eye_shape):
     eye = input_data['eye'].reshape(*eye_shape)
-    input_landmarks = input_data['landmarks'].reshape(18, 2)
-    output_landmarks = output['landmarks'].reshape(18, 2)
 
     fig, ax = plt.subplots(1, 3)
 

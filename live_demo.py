@@ -17,6 +17,8 @@ from webcam.fps import FPS
 from webcam.webcam_stream import WebcamVideoStream
 from multiprocessing import Queue, Pool
 
+import math
+
 NUM_CLASSES = 90
 
 from data_sources.img_data_source import ImgDataSource
@@ -39,7 +41,17 @@ parser.add_argument('-num-w', '--num-workers', dest='num_workers', type=int,
                     default=2, help='Number of workers.')
 parser.add_argument('-q-size', '--queue-size', dest='queue_size', type=int,
                     default=1, help='Size of the queue.')
-args = parser.parse_args()  
+args = parser.parse_args()
+
+
+IRIS_X = 1000
+IRIS_Y = 500
+old_iris = None
+
+MAX_X = 20000
+MAX_Y = 20000
+MIN_X = 0
+MIN_Y = 0
 
 
 # Function for creating landmark coordinate list
@@ -116,6 +128,29 @@ def get_eye_info(landmarks, frame_gray):
             'side': 'left' if is_left else 'right',
         })
     return eyes
+
+def _limit_mouse(pos_x, pos_y):
+    global MAX_X, MIN_X, MAX_Y, MIN_Y
+
+    pos_x = max(MIN_X, min(pos_x, MAX_X))
+    pos_y = max(MIN_Y, min(pos_y, MAX_Y))
+
+    return pos_x, pos_y
+
+
+def move_mouse(x, y, threshold_x=0.8, threshold_y=0.8):
+    global old_iris, IRIS_X, IRIS_Y
+    
+    # print(x, y)
+    if abs(y) > threshold_y:
+        IRIS_Y -= 80 * y
+    
+    if abs(x) > threshold_x:
+        IRIS_X -= 100 * x
+
+    IRIS_X, IRIS_Y = _limit_mouse(IRIS_X, IRIS_Y)
+    cmd = 'xdotool mousemove %s %s' % (IRIS_X, IRIS_Y)
+    os.system(cmd)
 
 
 def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks, eye_radius, face, frame_rgb):
@@ -219,6 +254,10 @@ def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks, ey
             util.draw_gaze(bgr, iris_centre, np.mean(gaze_history, axis=0),
                             length=120.0, thickness=1)    
 
+
+
+            if eye_side == 'left':
+                move_mouse(-math.sin(phi), math.sin(theta))
             return bgr, gaze_history, current_gaze
         else:
             return bgr, gaze_history, None
