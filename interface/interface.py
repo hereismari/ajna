@@ -21,56 +21,52 @@ class Circle(pygame.sprite.Sprite):
         self.rect.center = pygame.mouse.get_pos()
 
 
-class Sprite(pygame.sprite.Sprite):
+class Target(pygame.sprite.Sprite):
     def __init__(self, pos):
         pygame.sprite.Sprite.__init__(self)
         self.image = pygame.Surface([20, 20])
         self.image.fill((255, 0, 0))
         self.rect = self.image.get_rect()
-
         self.rect.center = pos
 
-        def update(self, pos):
-            self.rect.center = pos
+    def update(self, pos):
+        self.rect.center = pos
 
 
 def main():
-    pygame.display.set_caption("move the circle with the mouse")
+    pygame.display.set_caption("Ajna")
 
     background = pygame.Surface(screen.get_size())
     background.fill((255, 255, 255))
     screen.blit(background, (0, 0))
 
-    circle = Circle()
-    allSprites = pygame.sprite.Group(circle)
+    player = Circle()
+    player_group = pygame.sprite.Group(player)
 
-    target = Sprite([100, 200])
+    target = Target([100, 200])
     target_group = pygame.sprite.Group()
     target_group.add(target)
-
-    # hide mouse
+    
     clock = pygame.time.Clock()
     keepGoing = True
-
-    left = 200
-    top = 100
+    
     while keepGoing:
         clock.tick(30)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 keepGoing = False
 
-        allSprites.clear(screen, background)
-        allSprites.update()
-        allSprites.draw(screen)
-
-        target_group.draw(screen)
-
-        hit = pygame.sprite.spritecollide(circle, target_group, True)
+        player_group.clear(screen, background)
+        player_group.update()
+        player_group.draw(screen)
+        
+        hit = pygame.sprite.spritecollide(player, target_group, False)
 
         if hit:
             print("hitou toda!")
-            target.update((150, 30))
+            x = random.randint(100, 400)              
+            y = random.randint(100, 400)                          
+            target_group.update((x, y))            
 
         target_group.draw(screen)
 
@@ -78,7 +74,6 @@ def main():
 
     # return mouse
     pygame.mouse.set_visible(True)
-
 
 if __name__ == "__main__":
     main()
