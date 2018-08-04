@@ -87,8 +87,8 @@ def plot_predictions(output, input_data, eye_shape):
 
     # both in same image
     img = ax[0].imshow(eye, cmap='gray')
-    ax[0] = _plot_predictions(ax[0], input_data)
-    ax[0] = _plot_predictions(ax[0], output)
+    ax[0] = _plot_predictions(ax[0], input_data, colors=['blue'] * 3)
+    ax[0] = _plot_predictions(ax[0], output, colors=['red'] * 3)
     ax[0].set_title('Predições Vs Pontos reais')
     
     # real
@@ -103,9 +103,8 @@ def plot_predictions(output, input_data, eye_shape):
     plt.show()
 
 
-def _plot_predictions(ax, data, colors=['green', 'yellow', 'red', 'magenta', 'blue']):
+def _plot_predictions(ax, data, colors=['purple', 'orange',  'magenta']):
     eye_landmarks = data['landmarks'].reshape(18, 2)
-    eyeball_radius = data['radius'].reshape(1)
 
     landmarks = OrderedDict()
     landmarks['eyelid'] = eye_landmarks[0:8, :]
@@ -113,15 +112,11 @@ def _plot_predictions(ax, data, colors=['green', 'yellow', 'red', 'magenta', 'bl
     landmarks['iris_centre'] = eye_landmarks[16, :].reshape(1, 2)
     
     for key, color in zip(landmarks, colors):
+        print(color)
         landmark = landmarks[key]
         for points in landmark:
             circ = Circle((points[0], points[1]), 1, alpha=0.7, color=color)
             ax.add_patch(circ)
-    
-    iris = landmarks['iris_centre'][0]
-    eyeball_line = Line2D((iris[0]-eyeball_radius, iris[1]),
-                          (iris[0]+eyeball_radius, iris[1]))
-    ax.add_line(eyeball_line)
 
     return ax
 
