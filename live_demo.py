@@ -41,7 +41,7 @@ parser.add_argument('-num-w', '--num-workers', dest='num_workers', type=int,
                     default=2, help='Number of workers.')
 parser.add_argument('-q-size', '--queue-size', dest='queue_size', type=int,
                     default=1, help='Size of the queue.')
-args = parser.parse_args()  
+args = parser.parse_args()
 
 
 # Function for creating landmark coordinate list
@@ -64,10 +64,11 @@ def get_eye_info(landmarks, frame_gray):
     oh, ow = tuple(args.eye_shape)
     eyes = []
     # for corner1, corner2, is_left in [(2, 3, True), (0, 1, False)]:
-    for corner1, corner2, is_left in [(36, 39, True), (42, 45, False)]: 
+    for corner1, corner2, is_left in [(36, 39, True), (42, 45, False)]:
         x1, y1 = landmarks[corner1, :]
         x2, y2 = landmarks[corner2, :]
-        eye_width = 1.5 * np.linalg.norm(landmarks[corner1, :] - landmarks[corner2, :])
+        eye_width = 1.5 * \
+            np.linalg.norm(landmarks[corner1, :] - landmarks[corner2, :])
         if eye_width == 0.0:
             continue
         cx, cy = 0.5 * (x1 + x2), 0.5 * (y1 + y2)
@@ -106,12 +107,12 @@ def get_eye_info(landmarks, frame_gray):
         # Get rotated and scaled, and segmented image
         transform_mat = centre_mat * scale_mat * rotate_mat * translate_mat
         inv_transform_mat = (inv_translate_mat * inv_rotate_mat * inv_scale_mat *
-                                inv_centre_mat)
+                             inv_centre_mat)
         eye_image = cv2.warpAffine(frame_gray, transform_mat[:2, :], (ow, oh))
-        
+
         if is_left:
             eye_image = np.fliplr(eye_image)
-        
+
         eyes.append({
             'image': eye_image,
             'inv_landmarks_transform_mat': inv_transform_mat,
@@ -130,30 +131,32 @@ def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks, ey
     # bgr = cv2.flip(bgr, flipCode=1)
     eye_image = eye['image']
     eye_side = eye['side']
-    #eye_landmarks = landmarks
-    #eye_radius = radius
+    # eye_landmarks = landmarks
+    # eye_radius = radius
     if eye_side == 'left':
         eye_landmarks[:, 0] = eye_image.shape[1] - eye_landmarks[:, 0]
         eye_image = np.fliplr(eye_image)
 
     # Embed eye image and annotate for picture-in-picture
     eye_upscale = 2
-    eye_image_raw = cv2.cvtColor(cv2.equalizeHist(eye_image), cv2.COLOR_GRAY2BGR)
-    eye_image_raw = cv2.resize(eye_image_raw, (0, 0), fx=eye_upscale, fy=eye_upscale)
+    eye_image_raw = cv2.cvtColor(
+        cv2.equalizeHist(eye_image), cv2.COLOR_GRAY2BGR)
+    eye_image_raw = cv2.resize(
+        eye_image_raw, (0, 0), fx=eye_upscale, fy=eye_upscale)
     eye_image_annotated = np.copy(eye_image_raw)
 
     if can_use_eyelid:
         cv2.polylines(
             eye_image_annotated,
             [np.round(eye_upscale*eye_landmarks[0:8]).astype(np.int32)
-                                                        .reshape(-1, 1, 2)],
+             .reshape(-1, 1, 2)],
             isClosed=True, color=(255, 255, 0), thickness=1, lineType=cv2.LINE_AA,
         )
     if can_use_iris:
         cv2.polylines(
             eye_image_annotated,
             [np.round(eye_upscale*eye_landmarks[8:16]).astype(np.int32)
-                                                        .reshape(-1, 1, 2)],
+             .reshape(-1, 1, 2)],
             isClosed=True, color=(0, 255, 255), thickness=1, lineType=cv2.LINE_AA,
         )
         cv2.drawMarker(
@@ -178,19 +181,20 @@ def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks, ey
         frame_landmarks = landmarks
         for landmark in frame_landmarks[:-1]:
             cv2.drawMarker(bgr, tuple(np.round(landmark).astype(np.int32)),
-                            color=(0, 0, 255), markerType=cv2.MARKER_STAR,
-                            markerSize=2, thickness=1, line_type=cv2.LINE_AA)
+                           color=(0, 0, 255), markerType=cv2.MARKER_STAR,
+                           markerSize=2, thickness=1, line_type=cv2.LINE_AA)
             cv2.rectangle(
                 bgr, tuple(np.round(face[:2]).astype(np.int32)),
                 tuple(np.round(face[2:]).astype(np.int32)),
                 color=(0, 255, 255), thickness=1, lineType=cv2.LINE_AA,
             )
 
-        eye_landmarks = np.concatenate([eye_landmarks, [[eye_landmarks[-1, 0] + eye_radius, eye_landmarks[-1, 1]]]])
+        eye_landmarks = np.concatenate(
+            [eye_landmarks, [[eye_landmarks[-1, 0] + eye_radius, eye_landmarks[-1, 1]]]])
         eye_landmarks = np.asmatrix(np.pad(eye_landmarks, ((0, 0), (0, 1)),
-                                            'constant', constant_values=1.0))
+                                           'constant', constant_values=1.0))
         eye_landmarks = (eye_landmarks *
-                            eye['inv_landmarks_transform_mat'].T)[:, :2]
+                         eye['inv_landmarks_transform_mat'].T)[:, :2]
         eye_landmarks = np.asarray(eye_landmarks)
         eyelid_landmarks = eye_landmarks[0:8, :]
         iris_landmarks = eye_landmarks[8:16, :]
@@ -202,7 +206,8 @@ def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks, ey
         if can_use_eye:
             # Visualize landmarks
             cv2.drawMarker(  # Eyeball centre
-                bgr, tuple(np.round(eyeball_centre.astype(np.float32)).astype(np.int32)),
+                bgr, tuple(np.round(eyeball_centre.astype(
+                    np.float32)).astype(np.int32)),
                 color=(255, 0, 0),
                 markerType=cv2.MARKER_CROSS, markerSize=4,
                 thickness=1, line_type=cv2.LINE_AA,
@@ -210,7 +215,8 @@ def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks, ey
 
             i_x0, i_y0 = iris_centre
             e_x0, e_y0 = eyeball_centre
-            theta = -np.arcsin(np.clip((i_y0 - e_y0) / eyeball_radius, -1.0, 1.0))
+            theta = -np.arcsin(np.clip((i_y0 - e_y0) /
+                                       eyeball_radius, -1.0, 1.0))
             phi = np.arcsin(np.clip((i_x0 - e_x0) / (eyeball_radius * -np.cos(theta)),
                                     -1.0, 1.0))
             current_gaze = np.array([theta, phi])
@@ -219,7 +225,7 @@ def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks, ey
             if len(gaze_history) > gaze_history_max_len:
                 gaze_history = gaze_history[-gaze_history_max_len:]
             util.draw_gaze(bgr, iris_centre, np.mean(gaze_history, axis=0),
-                            length=120.0, thickness=1)    
+                           length=120.0, thickness=1)
 
             return bgr, gaze_history, current_gaze
         else:
@@ -233,8 +239,10 @@ def detect_eye_landmarks(image_np, datasource, preprocessor, sess, model):
     datasource.image = preprocessed_image
     datasource.run_single(sess)
     model.eval(sess)
-    input_image, eye_landmarks, eye_heatmaps, eye_radius = model.run_model(sess)
-    assert np.all(input_image == preprocessed_image), (input_image, preprocessed_image)
+    input_image, eye_landmarks, eye_heatmaps, eye_radius = model.run_model(
+        sess)
+    assert np.all(input_image == preprocessed_image), (input_image,
+                                                       preprocessed_image)
     return eye_landmarks, eye_heatmaps, eye_radius
 
 
@@ -261,7 +269,7 @@ def setup():
     sess.run(init_l)
     # Restore model checkpoint
     saver.restore(sess, args.model_checkpoint)
-    
+
     return datasource, preprocessor, sess, model
 
 
@@ -269,12 +277,14 @@ def worker(input_q, output_q):
     datasource, preprocessor, sess, model = setup()
     while True:
         x = input_q.get()
-        output_q.put(detect_eye_landmarks(x, datasource, preprocessor, sess, model))
+        output_q.put(detect_eye_landmarks(
+            x, datasource, preprocessor, sess, model))
     sess.close()
 
+
 def distance_to_camera(knownWidth, focalLength, perWidth):
-	# compute and return the distance from the maker to the camera
-	return (knownWidth * focalLength) / perWidth
+        # compute and return the distance from the maker to the camera
+    return (knownWidth * focalLength) / perWidth
 
 
 # initialize the known distance from the camera to the object, which
@@ -283,6 +293,7 @@ KNOWN_DISTANCE = 60.0
 
 # initialize the known eye width, which in this case is in average 2.5 cm
 KNOWN_WIDTH = 2.5
+
 
 def get_focal_length(landmarks, KNOWN_DISTANCE, KNOWN_WIDTH):
 
@@ -295,6 +306,17 @@ def get_focal_length(landmarks, KNOWN_DISTANCE, KNOWN_WIDTH):
     focal_Length = (eye_width * KNOWN_DISTANCE) / KNOWN_WIDTH
 
     return focal_Length
+
+
+def estimate(eye1):
+    point1 = to_3D(eye1.coordinates)
+    print(point1)
+
+
+# Converte uma coordenada na imagem da webcam para um ponto 3D
+def to_3D(point):
+    x, y = point
+    return zero + Point(x, 0, y)
 
 
 if __name__ == '__main__':
@@ -322,21 +344,26 @@ if __name__ == '__main__':
     while True:  # fps._numFrames < 120
         frame = video_capture.read()
         t = time.time()
-        
+
         # resizing frame
-        frame = imutils.resize(frame, width=800)
+        window_name = "window"
+        cv2.namedWindow(window_name, cv2.WND_PROP_FULLSCREEN)
+        cv2.setWindowProperty(
+            window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
+        # frame = imutils.resize(frame, width=800)
 
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         # grayscale conversion of image because it is computationally efficient
         # to perform operations on single channeled (grayscale) image
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        
+
         # detecting faces
         face_boundaries = face_detector(frame_gray, 0)
         # if there's no face do nothing
         if len(face_boundaries) < 1:
             continue
-        
+
         face = face_boundaries[0]
         # for face in face_boundaries:
         # Let's predict the landmarks
@@ -345,12 +372,11 @@ if __name__ == '__main__':
         landmarks = land2coords(landmarks)
 
         if count == 0:
-            focal_length = get_focal_length(landmarks, KNOWN_DISTANCE, KNOWN_WIDTH)
+            focal_length = get_focal_length(
+                landmarks, KNOWN_DISTANCE, KNOWN_WIDTH)
             count += 1
 
         corner1, corner2 = (36, 39)
-
-        # eye_width = landmarks[corner1, :] - landmarks[corner2, :]
 
         x1, y1 = landmarks[corner1, :]
         x2, y2 = landmarks[corner2, :]
@@ -358,7 +384,10 @@ if __name__ == '__main__':
         eye_width = math.hypot(x2 - x1, y2 - y1)
 
         distance = distance_to_camera(KNOWN_WIDTH, focal_length, eye_width)
-        cv2.putText(frame, "%.2f cm" % (distance), (frame.shape[1] - 200, frame.shape[0] - 20),cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 2)
+        cv2.putText(frame, "%.2f cm" % (
+            distance), (frame.shape[1] - 200, frame.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 2)
+
+        cv2.circle(frame, (447, 63), 10, (0, 0, 255), -1)
 
         eyes = get_eye_info(landmarks, frame_gray)
         face = (face.left(), face.top(), face.right(), face.bottom())
@@ -366,13 +395,14 @@ if __name__ == '__main__':
             input_q.put(eye['image'])
             eye_landmarks, heatmaps, eye_radius = output_q.get()
             eye_landmarks = eye_landmarks.reshape(18, 2)
-            bgr, gaze_history, gaze = estimate_gaze(gaze_history, eye, heatmaps, landmarks, eye_landmarks, eye_radius, face, frame)
-            
+            bgr, gaze_history, gaze = estimate_gaze(
+                gaze_history, eye, heatmaps, landmarks, eye_landmarks, eye_radius, face, frame)
+
             for (a, b) in landmarks.reshape(-1, 2):
                 cv2.circle(frame, (a, b), 2, (0, 255, 0), -1)
- 
+
         print('[INFO] elapsed time: {:.2f}'.format(time.time() - t))
-        cv2.imshow("frame", bgr)
+        cv2.imshow(window_name, bgr)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
