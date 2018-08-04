@@ -35,7 +35,48 @@ def mkdir(folder):
 
 def load_pickle(filename):
      return pickle.load(open(filename, 'rb'))
+
+
+import os
+import pickle
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
+from matplotlib.lines import Line2D
+
+from collections import OrderedDict
+
+
+def print_progress_bar(count, total, status='', bar_len=50, verbose=True, log_file=None):
+    filled_len = int(round(bar_len * count / float(total)))
+
+    percents = round(100.0 * count / float(total), 1)
+    bar = '=' * filled_len + '-' * (bar_len - filled_len)
+
+    if verbose:
+        print('(%5d/%5d) [%s] %s%s \t %s' % (count, total, bar, percents, '%', status))
+    else:
+        print_replace('(%5d/%5d) [%s] %s%s \t %s' % (count, total, bar, percents, '%', status))
     
+    if log_file:
+        log_file.write('(%5d/%5d) [%s] %s%s \t %s' % (count, total, bar, percents, '%', status))
+
+
+def print_replace(status):
+    ERASE_LINE = '\x1b[2K'
+    print('\r%s' % (ERASE_LINE), end = '', flush=True)
+    print('\r%s' % (status), end = '', flush=True)
+
+
+def mkdir(folder):
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+def load_pickle(filename):
+     return pickle.load(open(filename, 'rb'))
+    
+def get_basename(filepath):
+    return os.path.splitext(os.path.basename(filepath))[0]
 
 def plot_predictions(output, input_data, eye_shape):
     eye = input_data['eye'].reshape(*eye_shape)
@@ -46,30 +87,44 @@ def plot_predictions(output, input_data, eye_shape):
 
     # both in same image
     img = ax[0].imshow(eye, cmap='gray')
-
-    for landmark in input_landmarks:
-        circ = Circle((landmark[0], landmark[1]), 1, alpha=0.7, color='green')
-        ax[0].add_patch(circ)
-    for landmark in output_landmarks:
-        circ = Circle((landmark[0], landmark[1]), 1, alpha=0.7, color='red')
-        ax[0].add_patch(circ)
+    ax[0] = _plot_predictions(ax[0], input_data)
+    ax[0] = _plot_predictions(ax[0], output)
     ax[0].set_title('Predições Vs Pontos reais')
     
     # real
     img = ax[1].imshow(eye, cmap='gray')
-    for landmark in input_landmarks:
-        circ = Circle((landmark[0], landmark[1]), 1, alpha=0.7, color='green')
-        ax[1].add_patch(circ)
+    ax[1] = _plot_predictions(ax[1], input_data)
     ax[1].set_title('Pontos reais')
     
     # predicted
     img = ax[2].imshow(eye, cmap='gray')
-    for landmark in output_landmarks:
-        circ = Circle((landmark[0], landmark[1]), 1, alpha=0.7, color='red')
-        ax[2].add_patch(circ)
-
+    ax[2] = _plot_predictions(ax[2], output)
     ax[2].set_title('Predições')
     plt.show()
+
+
+def _plot_predictions(ax, data, colors=['green', 'yellow', 'red', 'magenta', 'blue']):
+    eye_landmarks = data['landmarks'].reshape(18, 2)
+    eyeball_radius = data['radius'].reshape(1)
+
+    landmarks = OrderedDict()
+    landmarks['eyelid'] = eye_landmarks[0:8, :]
+    landmarks['iris'] = eye_landmarks[8:16, :]
+    landmarks['iris_centre'] = eye_landmarks[16, :].reshape(1, 2)
+    
+    for key, color in zip(landmarks, colors):
+        landmark = landmarks[key]
+        for points in landmark:
+            circ = Circle((points[0], points[1]), 1, alpha=0.7, color=color)
+            ax.add_patch(circ)
+    
+    iris = landmarks['iris_centre'][0]
+    eyeball_line = Line2D((iris[0]-eyeball_radius, iris[1]),
+                          (iris[0]+eyeball_radius, iris[1]))
+    ax.add_line(eyeball_line)
+
+    return ax
+
 
 def plot_predictions2(output, input_img):
     eye = input_img
