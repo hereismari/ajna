@@ -1,16 +1,16 @@
 from __future__ import division, print_function, absolute_import
 
-
+import argparse
+import os
 import util.util as util
 
 from data_sources.data_source import DataSource
 from models.cnn import CNN
 from learning.trainer import Trainer
+import glob
 
-import argparse
-
-parser = argparse.ArgumentParser(description='Predict CNN (Elg).')
-parser.add_argument('--input-image', type=str, required=True)
+parser = argparse.ArgumentParser(description='Eval CNN (Elg).')
+parser.add_argument('--test-path', type=str, required=True)
 parser.add_argument('--model-checkpoint', type=str, required=True)
 
 parser.add_argument('--eye-shape', type=int, nargs="+", default=[90, 60])
@@ -20,7 +20,8 @@ parser.add_argument('--data-format', type=str, default='NCHW')
 
 def main(args):
     # Get dataset
-    datasource = DataSource(None, [args.input_image], shape=tuple(args.eye_shape),
+    test_files = glob.glob(os.path.join(args.test_path, '*.pickle'))
+    datasource = DataSource(None, test_files, shape=tuple(args.eye_shape),
                             data_format=args.data_format, heatmap_scale=args.heatmap_scale)
 
     # Get model
@@ -38,11 +39,9 @@ def main(args):
     # Get evaluator
     evaluator = Trainer(model, model_checkpoint=args.model_checkpoint)
 
-    # Predict
-    output, losses = evaluator.run_predict(datasource)
-    input_data = util.load_pickle(args.input_image)
-    print('Losses', losses)
-    util.plot_predictions(output, input_data, tuple(args.eye_shape))
+    # Evaluate
+    avg_losses = evaluator.run_eval(datasource)
+    print('Avarage Losses', avg_losses)
 
 
 if __name__ == '__main__':
