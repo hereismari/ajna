@@ -5,6 +5,8 @@ import util.util as util
 import numpy as np
 import dlib
 
+import math
+
 import sys
 sys.path.append('../..')
 
@@ -270,6 +272,31 @@ def worker(input_q, output_q):
         output_q.put(detect_eye_landmarks(x, datasource, preprocessor, sess, model))
     sess.close()
 
+def distance_to_camera(knownWidth, focalLength, perWidth):
+	# compute and return the distance from the maker to the camera
+	return (knownWidth * focalLength) / perWidth
+
+
+# initialize the known distance from the camera to the object, which
+# in this case is 60 cm
+KNOWN_DISTANCE = 60.0
+
+# initialize the known eye width, which in this case, the piece of
+# paper is 2.5 cm
+KNOWN_WIDTH = 2.5
+
+def get_focal_length(landmarks, KNOWN_DISTANCE, KNOWN_WIDTH):
+
+    corner1, corner2, is_left = (36, 39, True)
+    x1, y1 = landmarks[corner1, :]
+    x2, y2 = landmarks[corner2, :]
+
+    eye_width = math.hypot(x2 - x1, y2 - y1)
+
+    focal_Length = (eye_width * KNOWN_DISTANCE) / KNOWN_WIDTH
+
+    return focal_Length
+
 
 if __name__ == '__main__':
     shape = (args.eye_shape[1], args.eye_shape[0])
@@ -289,6 +316,8 @@ if __name__ == '__main__':
     # get file:shape_predictor_68_face_landmarks.dat from
     # link: https://drive.google.com/firun_prele/d/1XvAobn_6xeb8Ioa8PBnpCXZm8mgkBTiJ/view?usp=sharing
     landmark_predictor = dlib.shape_predictor(args.model_crop_eyes)
+
+    count = 0
 
     gaze_history = []
     while True:  # fps._numFrames < 120
@@ -315,6 +344,23 @@ if __name__ == '__main__':
         landmarks = landmark_predictor(frame_gray, face)
         # converting co-ordinates to NumPy array
         landmarks = land2coords(landmarks)
+
+        if count == 0:
+            focal_length = get_focal_length(landmarks, KNOWN_DISTANCE, KNOWN_WIDTH)
+            count += 1
+
+        corner1, corner2 = (36, 39)
+
+        # eye_width = landmarks[corner1, :] - landmarks[corner2, :]
+
+        x1, y1 = landmarks[corner1, :]
+        x2, y2 = landmarks[corner2, :]
+
+        eye_width = math.hypot(x2 - x1, y2 - y1)
+
+        distance = distance_to_camera(KNOWN_WIDTH, focal_length, eye_width)
+
+        cv2.putText(frame, "%.2f cm" % (distance), (frame.shape[1] - 200, frame.shape[0] - 20),cv2.FONT_HERSHEY_SIMPLEX, 1.0, (10, 186, 181), 2)
 
         eyes = get_eye_info(landmarks, frame_gray)
         face = (face.left(), face.top(), face.right(), face.bottom())
