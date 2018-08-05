@@ -16,8 +16,10 @@ import multiprocessing
 import tensorflow as tf
 
 from webcam.fps import FPS
-from webcam.webcam import WebcamVideoStream
+from webcam.webcam_stream import WebcamVideoStream
 from multiprocessing import Queue, Pool
+
+import math
 
 NUM_CLASSES = 90
 
@@ -42,6 +44,16 @@ parser.add_argument('-num-w', '--num-workers', dest='num_workers', type=int,
 parser.add_argument('-q-size', '--queue-size', dest='queue_size', type=int,
                     default=1, help='Size of the queue.')
 args = parser.parse_args()
+
+
+IRIS_X = 1000
+IRIS_Y = 500
+old_iris = None
+
+MAX_X = 20000
+MAX_Y = 20000
+MIN_X = 0
+MIN_Y = 0
 
 
 # Function for creating landmark coordinate list
@@ -119,6 +131,32 @@ def get_eye_info(landmarks, frame_gray):
             'side': 'left' if is_left else 'right',
         })
     return eyes
+
+
+def _limit_mouse(pos_x, pos_y):
+    global MAX_X, MIN_X, MAX_Y, MIN_Y
+
+    pos_x = max(MIN_X, min(pos_x, MAX_X))
+    pos_y = max(MIN_Y, min(pos_y, MAX_Y))
+
+    return pos_x, pos_y
+
+
+def move_mouse(x, y):
+    global old_iris, IRIS_X, IRIS_Y
+
+    print(x, y)
+
+    if y > 0.5 or y < -0.5:
+        IRIS_Y -= 80 * y
+
+    if x > 0.6 or x < -0.1:
+        IRIS_X -= 100 * x
+
+    IRIS_X, IRIS_Y = _limit_mouse(IRIS_X, IRIS_Y)
+    print("iris:", IRIS_X, IRIS_Y)
+    cmd = 'xdotool mousemove %s %s' % (IRIS_X, IRIS_Y)
+    os.system(cmd)
 
 
 def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks, eye_radius, face, frame_rgb):
@@ -227,6 +265,8 @@ def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks, ey
             util.draw_gaze(bgr, iris_centre, np.mean(gaze_history, axis=0),
                            length=120.0, thickness=1)
 
+            if eye_side == 'left':
+                move_mouse(-math.sin(phi), math.sin(theta))
             return bgr, gaze_history, current_gaze
         else:
             return bgr, gaze_history, None
@@ -346,12 +386,12 @@ if __name__ == '__main__':
         t = time.time()
 
         # resizing frame
-        window_name = "window"
-        cv2.namedWindow(window_name, cv2.WND_PROP_FULLSCREEN)
-        cv2.setWindowProperty(
-            window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        window_name = "Ajna"
+        # cv2.namedWindow(window_name, cv2.WND_PROP_FULLSCREEN)
+        # cv2.setWindowProperty(
+        #     window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
-        # frame = imutils.resize(frame, width=800)
+        frame = imutils.resize(frame, width=800)
 
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         # grayscale conversion of image because it is computationally efficient
@@ -387,7 +427,7 @@ if __name__ == '__main__':
         cv2.putText(frame, "%.2f cm" % (
             distance), (frame.shape[1] - 200, frame.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 2)
 
-        cv2.circle(frame, (447, 63), 10, (0, 0, 255), -1)
+        # cv2.circle(frame, (447, 63), 10, (0, 0, 255), -1)
 
         eyes = get_eye_info(landmarks, frame_gray)
         face = (face.left(), face.top(), face.right(), face.bottom())

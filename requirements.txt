@@ -6,3 +6,5 @@ opencv
 numpy
 pandas
 matplotlib
+pygame
+sympy

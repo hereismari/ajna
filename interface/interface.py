@@ -10,8 +10,8 @@ pygame.init()
 info_monitor = pygame.display.Info()
 
 # Define altura e largura da tela de interface
-height = int(info_monitor.current_h / 2)
-width = int(info_monitor.current_w / 2)
+height = int(info_monitor.current_h * 4 / 5)
+width = int(info_monitor.current_w / 3)
 screen = pygame.display.set_mode((width, height))
 
 
