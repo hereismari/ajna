@@ -37,7 +37,7 @@ class Worker(Thread):
         frame, data = self.model.run()
 
         if data is not None:
-            if sum(1 for d in data) == 2:
+            if sum(1 for d in data if d is not None) == 2:
                 return frame, [Eye(tuple(map(float, coordinates)), float(radius[0][0]), (-math.sin(phi), -1, math.sin(theta))) for (theta, phi), coordinates, radius in data]
 
     def dispose(self):
@@ -50,7 +50,7 @@ class Screen(object):
             self.camera = Camera(640, 420, 50)
         else:
             self.camera = camera
-        
+
         if worker is None:
             self.worker = Worker()
         else:
@@ -64,13 +64,13 @@ class Screen(object):
 
     def react(self, event):
         pass
-    
+
     def update(self, delta):
         pass
-    
+
     def dispose(self):
         self.worker.dispose()
-    
+
     def draw(self, display):
         if self.frame is not None:
             rows = 300
@@ -99,7 +99,7 @@ class DemoScreen(Screen):
             y = min(max(0, y), info.current_h)
 
             self.display_point(display, x, y)
-        
+
         super().draw(display)
 
     def update(self, delta):
@@ -186,7 +186,7 @@ if __name__ == '__main__':
     pygame.init()
     pygame.display.set_caption('Ajna')
 
-    display = pygame.display.set_mode((0, 0))
+    display = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
     info = pygame.display.Info()
     clock = pygame.time.Clock()
 
