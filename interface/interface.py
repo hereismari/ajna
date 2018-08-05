@@ -6,13 +6,10 @@ import pygame
 import random
 pygame.init()
 
-# Recupera info da resolucao do monitor
 info_monitor = pygame.display.Info()
-
-# Define altura e largura da tela de interface
-height = int(info_monitor.current_h * 4 / 5)
-width = int(info_monitor.current_w / 3)
-screen = pygame.display.set_mode((width, height))
+screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+height = info_monitor.current_h 
+width = info_monitor.current_w
 
 
 class Circle(pygame.sprite.Sprite):
@@ -30,7 +27,7 @@ class Circle(pygame.sprite.Sprite):
 class Target(pygame.sprite.Sprite):
     def __init__(self, pos):
         pygame.sprite.Sprite.__init__(self)
-        self.image = pygame.Surface([40, 40])
+        self.image = pygame.Surface([200, 200])
         self.image.fill((255, 0, 0))
         self.rect = self.image.get_rect()
         self.rect.center = pos
@@ -40,8 +37,8 @@ class Target(pygame.sprite.Sprite):
 
 
 def main():
+    hit_count = 0
     pygame.display.set_caption("Ajna")
-
     BACKGROUND_COLOR = (255, 255, 255)
     background = pygame.Surface(screen.get_size())
     background.fill(BACKGROUND_COLOR)
@@ -53,6 +50,7 @@ def main():
     target = Target([100, 200])
     target_group = pygame.sprite.Group()
     target_group.add(target)
+
 
     clock = pygame.time.Clock()
     keepGoing = True
@@ -80,6 +78,7 @@ def main():
             y = random.randint(0, height - 50)
             target_group.clear(screen, background)
             target_group.update((x, y))
+            hit_count += 1
 
         pygame.display.flip()
 
