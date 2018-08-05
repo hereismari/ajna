@@ -1,3 +1,6 @@
+import sys
+sys.path.append('..')
+
 # neccessary imports
 import cv2
 import imutils
@@ -7,53 +10,14 @@ import dlib
 
 import math
 
-import sys
-sys.path.append('../..')
-
 import os
-import time
-import multiprocessing
 import tensorflow as tf
 
-from webcam.fps import FPS
 from webcam.webcam_stream import WebcamVideoStream
-from multiprocessing import Queue, Pool
-
-import math
-
-NUM_CLASSES = 90
 
 from data_sources.img_data_source import ImgDataSource
 from preprocessing.img_preprocessor import ImgPreprocessor
 from models.cnn import CNN
-from learning.trainer import Trainer
-
-import argparse
-parser = argparse.ArgumentParser(description='Webcam')
-
-parser.add_argument('--model-checkpoint', type=str, default='checkpoints/best_cnn.ckpt')
-parser.add_argument('--model-crop-eyes', type=str, default='shape_predictor_68_face_landmarks.dat',
-                    help='download it from: https://drive.google.com/firun_prele/d/1XvAobn_6xeb8Ioa8PBnpCXZm8mgkBTiJ/view?usp=sharing')
-parser.add_argument('--eye-shape', type=int, nargs="+", default=[90, 60])
-parser.add_argument('--heatmap-scale', type=float, default=1)
-parser.add_argument('--data-format', type=str, default='NHWC')
-parser.add_argument('-src', '--source', dest='video_source', type=int,
-                    default=0, help='Device index of the camera.')
-parser.add_argument('-num-w', '--num-workers', dest='num_workers', type=int,
-                    default=2, help='Number of workers.')
-parser.add_argument('-q-size', '--queue-size', dest='queue_size', type=int,
-                    default=1, help='Size of the queue.')
-args = parser.parse_args()
-
-
-IRIS_X = 1000
-IRIS_Y = 500
-old_iris = None
-
-MAX_X = 20000
-MAX_Y = 20000
-MIN_X = 0
-MIN_Y = 0
 
 
 # Function for creating landmark coordinate list
@@ -71,7 +35,7 @@ def land2coords(landmarks, dtype="int"):
     return coords
 
 
-def get_eye_info(landmarks, frame_gray):
+def get_eye_info(args, landmarks, frame_gray):
     # Segment eyes
     oh, ow = tuple(args.eye_shape)
     eyes = []
@@ -133,32 +97,6 @@ def get_eye_info(landmarks, frame_gray):
     return eyes
 
 
-def _limit_mouse(pos_x, pos_y):
-    global MAX_X, MIN_X, MAX_Y, MIN_Y
-
-    pos_x = max(MIN_X, min(pos_x, MAX_X))
-    pos_y = max(MIN_Y, min(pos_y, MAX_Y))
-
-    return pos_x, pos_y
-
-
-def move_mouse(x, y):
-    global old_iris, IRIS_X, IRIS_Y
-
-    print(x, y)
-
-    if y > 0.5 or y < -0.5:
-        IRIS_Y -= 80 * y
-
-    if x > 0.6 or x < -0.1:
-        IRIS_X -= 100 * x
-
-    IRIS_X, IRIS_Y = _limit_mouse(IRIS_X, IRIS_Y)
-    print("iris:", IRIS_X, IRIS_Y)
-    cmd = 'xdotool mousemove %s %s' % (IRIS_X, IRIS_Y)
-    os.system(cmd)
-
-
 def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks, eye_radius, face, frame_rgb):
     # Gaze estimation
     heatmaps_amax = np.amax(heatmaps.reshape(-1, 18), axis=0)
@@ -216,8 +154,7 @@ def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks, ey
         bgr[v1:v2, u0:u1] = eye_image_annotated
 
         # Visualize preprocessing results
-        frame_landmarks = landmarks
-        for landmark in frame_landmarks[:-1]:
+        for landmark in face_landmarks[:-1]:
             cv2.drawMarker(bgr, tuple(np.round(landmark).astype(np.int32)),
                            color=(0, 0, 255), markerType=cv2.MARKER_STAR,
                            markerSize=2, thickness=1, line_type=cv2.LINE_AA)
@@ -265,8 +202,6 @@ def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks, ey
             util.draw_gaze(bgr, iris_centre, np.mean(gaze_history, axis=0),
                            length=120.0, thickness=1)
 
-            if eye_side == 'left':
-                move_mouse(-math.sin(phi), math.sin(theta))
             return bgr, gaze_history, current_gaze
         else:
             return bgr, gaze_history, None
@@ -286,7 +221,7 @@ def detect_eye_landmarks(image_np, datasource, preprocessor, sess, model):
     return eye_landmarks, eye_heatmaps, eye_radius
 
 
-def setup():
+def setup(args):
     # Load a Tensorflow model into memory.
     # If needed froze the graph to get better performance.
     data_format = args.data_format
@@ -359,38 +294,29 @@ def to_3D(point):
     return zero + Point(x, 0, y)
 
 
-if __name__ == '__main__':
-    shape = (args.eye_shape[1], args.eye_shape[0])
+class Model:
+    def __init__(self, args):
+        self.args = args
 
-    # Queue used to iteract with the model
-    input_q = Queue(maxsize=args.queue_size)
-    output_q = Queue(maxsize=args.queue_size)
-    pool = Pool(args.num_workers, worker, (input_q, output_q))
+        # Start video capture
+        self.video_capture = WebcamVideoStream(src=args.video_source).start()
 
-    # Start video capture
-    video_capture = WebcamVideoStream(src=args.video_source).start()
-    fps = FPS().start()
+        # loading dlib's Hog Based face detector
+        self.face_detector = dlib.get_frontal_face_detector()
+        # loading dlib's 68 points-shape-predictor
+        # get file:shape_predictor_68_face_landmarks.dat from
+        # link: https://drive.google.com/firun_prele/d/1XvAobn_6xeb8Ioa8PBnpCXZm8mgkBTiJ/view?usp=sharing
+        self.landmark_predictor = dlib.shape_predictor(args.model_crop_eyes)
 
-    # loading dlib's Hog Based face detector
-    face_detector = dlib.get_frontal_face_detector()
-    # loading dlib's 68 points-shape-predictor
-    # get file:shape_predictor_68_face_landmarks.dat from
-    # link: https://drive.google.com/firun_prele/d/1XvAobn_6xeb8Ioa8PBnpCXZm8mgkBTiJ/view?usp=sharing
-    landmark_predictor = dlib.shape_predictor(args.model_crop_eyes)
+        self.count = 0
+        self.gaze_history = []
 
-    count = 0
+        self.datasource, self.preprocessor, self.sess, self.model = setup(args)
 
-    gaze_history = []
-    while True:  # fps._numFrames < 120
-        frame = video_capture.read()
-        t = time.time()
+    def run(self):
+        result = []
 
-        # resizing frame
-        window_name = "Ajna"
-        # cv2.namedWindow(window_name, cv2.WND_PROP_FULLSCREEN)
-        # cv2.setWindowProperty(
-        #     window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-
+        frame = self.video_capture.read()
         frame = imutils.resize(frame, width=800)
 
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -399,22 +325,22 @@ if __name__ == '__main__':
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         # detecting faces
-        face_boundaries = face_detector(frame_gray, 0)
+        face_boundaries = self.face_detector(frame_gray, 0)
         # if there's no face do nothing
         if len(face_boundaries) < 1:
-            continue
+            return frame, None
 
         face = face_boundaries[0]
         # for face in face_boundaries:
         # Let's predict the landmarks
-        landmarks = landmark_predictor(frame_gray, face)
+        landmarks = self.landmark_predictor(frame_gray, face)
         # converting co-ordinates to NumPy array
         landmarks = land2coords(landmarks)
 
-        if count == 0:
-            focal_length = get_focal_length(
+        if self.count == 0:
+            self.focal_length = get_focal_length(
                 landmarks, KNOWN_DISTANCE, KNOWN_WIDTH)
-            count += 1
+            self.count += 1
 
         corner1, corner2 = (36, 39)
 
@@ -423,33 +349,29 @@ if __name__ == '__main__':
 
         eye_width = math.hypot(x2 - x1, y2 - y1)
 
-        distance = distance_to_camera(KNOWN_WIDTH, focal_length, eye_width)
+        distance = distance_to_camera(KNOWN_WIDTH, self.focal_length, eye_width)
         cv2.putText(frame, "%.2f cm" % (
             distance), (frame.shape[1] - 200, frame.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 2)
 
         # cv2.circle(frame, (447, 63), 10, (0, 0, 255), -1)
 
-        eyes = get_eye_info(landmarks, frame_gray)
+        eyes = get_eye_info(self.args, landmarks, frame_gray)
         face = (face.left(), face.top(), face.right(), face.bottom())
         for eye in eyes:
-            input_q.put(eye['image'])
-            eye_landmarks, heatmaps, eye_radius = output_q.get()
+            eye_landmarks, heatmaps, eye_radius = detect_eye_landmarks(eye['image'], self.datasource, self.preprocessor, self.sess, self.model)
             eye_landmarks = eye_landmarks.reshape(18, 2)
-            bgr, gaze_history, gaze = estimate_gaze(
-                gaze_history, eye, heatmaps, landmarks, eye_landmarks, eye_radius, face, frame)
+            bgr, self.gaze_history, gaze = estimate_gaze(
+                self.gaze_history, eye, heatmaps, landmarks, eye_landmarks, eye_radius, face, frame)
 
             for (a, b) in landmarks.reshape(-1, 2):
                 cv2.circle(frame, (a, b), 2, (0, 255, 0), -1)
 
-        print('[INFO] elapsed time: {:.2f}'.format(time.time() - t))
-        cv2.imshow(window_name, bgr)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+            if gaze is not None:
+                result.append((gaze[0][0][0], gaze[1][0][0]))
 
-    fps.stop()
-    print('[INFO] elapsed time (total): {:.2f}'.format(fps.elapsed()))
-    print('[INFO] approx. FPS: {:.2f}'.format(fps.fps()))
+        return bgr, result
 
-    pool.terminate()
-    video_capture.stop()
-    cv2.destroyAllWindows()
+    def close(self):
+        self.video_capture.stop()
+        cv2.destroyAllWindows()
+        self.sess.close()
