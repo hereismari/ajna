@@ -6,8 +6,9 @@ import random
 from model import Model
 from pygame import gfxdraw
 
-import cv2
 
+import cv2
+import pickle
 
 parser = argparse.ArgumentParser(description='Webcam')
 
@@ -90,9 +91,8 @@ class CalibrationScreen():
                 'down': down,
             }
 
-            with open('thresholds.txt', 'w') as f:
-                text = json.dumps(thresholds)
-                f.write(text)
+            with open('../thresholds.pickle', 'wb') as f:
+                pickle.dump(thresholds, f)
 
             return None
         return self

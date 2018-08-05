@@ -3,9 +3,12 @@ import pickle
 
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
+from matplotlib.lines import Line2D
 
 import cv2
 import numpy as np
+
+from collections import OrderedDict
 
 
 def print_progress_bar(count, total, status='', bar_len=50, verbose=True, log_file=None):
@@ -35,16 +38,6 @@ def mkdir(folder):
 
 def load_pickle(filename):
      return pickle.load(open(filename, 'rb'))
-
-
-import os
-import pickle
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Circle
-from matplotlib.lines import Line2D
-
-from collections import OrderedDict
 
 
 def print_progress_bar(count, total, status='', bar_len=50, verbose=True, log_file=None):

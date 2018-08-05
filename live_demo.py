@@ -142,24 +142,29 @@ def _limit_mouse(pos_x, pos_y):
     return pos_x, pos_y
 
 
-def move_mouse(x, y):
+def move_mouse(theta, phi, thresholds):
     global old_iris, IRIS_X, IRIS_Y
 
-    print(x, y)
+    print(theta, phi)
 
-    if y > 0.5 or y < -0.5:
-        IRIS_Y -= 80 * y
+    if theta > thresholds['up']:
+        IRIS_Y -= 80
+    elif theta < thresholds['down']:
+        IRIS_Y += 80
+    
+    if phi < thresholds['left']:
+        IRIS_X -= 80
+    elif phi > thresholds['right']:
+        IRIS_X += 80
 
-    if x > 0.6 or x < -0.1:
-        IRIS_X -= 100 * x
 
     IRIS_X, IRIS_Y = _limit_mouse(IRIS_X, IRIS_Y)
-    print("iris:", IRIS_X, IRIS_Y)
     cmd = 'xdotool mousemove %s %s' % (IRIS_X, IRIS_Y)
     os.system(cmd)
 
 
-def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks, eye_radius, face, frame_rgb):
+def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks,
+                  eye_radius, face, frame_rgb, thresholds):
     # Gaze estimation
     heatmaps_amax = np.amax(heatmaps.reshape(-1, 18), axis=0)
     can_use_eye = np.all(heatmaps_amax > 0.7)
@@ -265,8 +270,8 @@ def estimate_gaze(gaze_history, eye, heatmaps, face_landmarks, eye_landmarks, ey
             util.draw_gaze(bgr, iris_centre, np.mean(gaze_history, axis=0),
                            length=120.0, thickness=1)
 
-            if eye_side == 'left':
-                move_mouse(-math.sin(phi), math.sin(theta))
+            move_mouse(theta, phi, thresholds)
+            
             return bgr, gaze_history, current_gaze
         else:
             return bgr, gaze_history, None
@@ -378,6 +383,8 @@ if __name__ == '__main__':
     # link: https://drive.google.com/firun_prele/d/1XvAobn_6xeb8Ioa8PBnpCXZm8mgkBTiJ/view?usp=sharing
     landmark_predictor = dlib.shape_predictor(args.model_crop_eyes)
 
+    thresholds = util.load_pickle('thresholds.pickle')
+
     count = 0
 
     gaze_history = []
@@ -436,7 +443,7 @@ if __name__ == '__main__':
             eye_landmarks, heatmaps, eye_radius = output_q.get()
             eye_landmarks = eye_landmarks.reshape(18, 2)
             bgr, gaze_history, gaze = estimate_gaze(
-                gaze_history, eye, heatmaps, landmarks, eye_landmarks, eye_radius, face, frame)
+                gaze_history, eye, heatmaps, landmarks, eye_landmarks, eye_radius, face, frame, thresholds)
 
             for (a, b) in landmarks.reshape(-1, 2):
                 cv2.circle(frame, (a, b), 2, (0, 255, 0), -1)
