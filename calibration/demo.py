@@ -1,14 +1,13 @@
 import argparse
-import json
+import cv2
+import os
+import pickle
 import pygame
 import random
 
 from model import Model
 from pygame import gfxdraw
 
-
-import cv2
-import pickle
 
 parser = argparse.ArgumentParser(description='Webcam')
 
@@ -30,7 +29,7 @@ def draw_point(display, x, y):
 
 
 def draw_text(display, text, x, y):
-    font = pygame.font.Font(None, 72)
+    font = pygame.font.Font(None, 48)
     surface = font.render(text, True, (0, 0, 0))
 
     width = surface.get_width()
@@ -39,11 +38,66 @@ def draw_text(display, text, x, y):
     display.blit(surface, (x -  width / 2, y - height / 2))
 
 
+def draw_frame(display, frame, x, y, size):
+    h, w = frame.shape[:2]
+
+    square = max(h, w)
+    frame = cv2.resize(frame, (square, square))
+
+    M = cv2.getRotationMatrix2D((square / 2, square / 2), 90, 1)
+    frame = cv2.warpAffine(frame, M, (square, square))
+
+    w, h = int(h * size), int(w * size)
+    frame = cv2.resize(frame, (w, h))
+
+    surface = pygame.surfarray.make_surface(frame)
+    w, h = surface.get_width(), surface.get_height()
+
+    display.blit(surface, (x - w / 2, y - h / 2))
+
+
 def average(numbers):
+    if len(numbers) == 0:
+        return None
     return sum(numbers) / len(numbers)
 
 
-class CalibrationScreen():
+class DemoScreen:
+    def __init__(self, thresholds):
+        self.thresholds = thresholds
+
+        self.gaze = None
+        self.frame = None
+
+    def draw(self, display):
+        if self.frame is not None:
+            draw_frame(display, self.frame, info.current_w / 2, info.current_h / 2, 0.50)
+
+        if self.gaze is not None:
+            theta, phi = self.gaze
+
+            if phi < self.thresholds['left']:
+                display.fill(0x42f462, ((0, 0), (info.current_w / 4, info.current_h)))
+            elif phi > self.thresholds['right']:
+                display.fill(0x42f462, ((info.current_w * 3 / 4, 0), (info.current_w, info.current_h)))
+
+            if theta < self.thresholds['down']:
+                display.fill(0x42f462, ((0, info.current_h * 3 / 4), (info.current_w, info.current_h)))
+            elif theta > self.thresholds['up']:
+                display.fill(0x42f462, ((0, 0), (info.current_w, info.current_h / 4)))
+
+    def react(self, event):
+        pass
+
+    def update(self, delta):
+        self.frame, eyes = model.run()
+        if eyes:
+            self.gaze = average(tuple(theta for theta, phi in eyes)), average(tuple(phi for theta, phi in eyes))
+
+        return self
+
+
+class CalibrationScreen:
     def __init__(self):
         self.horizontal_data = [[], []]
         self.vertical_data = [[], []]
@@ -56,11 +110,16 @@ class CalibrationScreen():
         ]
 
         random.shuffle(self.points)
+
         self.index = 0
+        self.frame = None
 
     def draw(self, display):
-        draw_text(display, '%d/%d' % (self.index, len(self.points)), info.current_w / 2, info.current_h / 2)
-        draw_text(display, 'Olhe para o ponto e aperte espaço', info.current_w / 2, info.current_h / 2 + 50)
+        if self.frame is not None:
+            draw_frame(display, self.frame, info.current_w / 2, info.current_h / 2, 0.50)
+
+        draw_text(display, '%d/%d' % (self.index, len(self.points)), 96, 96)
+        draw_text(display, 'Olhe para o ponto e aperte espaço', info.current_w / 2, info.current_h - 96)
 
         if self.index < len(self.points):
             x, y, h, v = self.points[self.index]
@@ -70,10 +129,8 @@ class CalibrationScreen():
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 x, y, h, v = self.points[self.index]
-                frame, eyes = model.run()
-                print(eyes)
 
-                for theta, phi in eyes:
+                for theta, phi in self.eyes:
                     self.horizontal_data[h].append(phi)
                     self.vertical_data[v].append(theta)
 
@@ -94,7 +151,9 @@ class CalibrationScreen():
             with open('../thresholds.pickle', 'wb') as f:
                 pickle.dump(thresholds, f)
 
-            return None
+            return DemoScreen(thresholds)
+        else:
+            self.frame, self.eyes = model.run()
         return self
 
 
@@ -124,7 +183,12 @@ if __name__ == '__main__':
     info = pygame.display.Info()
     clock = pygame.time.Clock()
 
-    screen = CalibrationScreen()
+    if os.path.exists('../thresholds.pickle'):
+        with open('../thresholds.pickle', 'rb') as f:
+            thresholds = pickle.load(f)
+        screen = DemoScreen(thresholds)
+    else:
+        screen = CalibrationScreen()
     model = Model(args)
 
     while screen:

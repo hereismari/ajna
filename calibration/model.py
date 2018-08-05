@@ -262,27 +262,6 @@ def distance_to_camera(knownWidth, focalLength, perWidth):
     return (knownWidth * focalLength) / perWidth
 
 
-# initialize the known distance from the camera to the object, which
-# in this case is 60 cm
-KNOWN_DISTANCE = 60.0
-
-# initialize the known eye width, which in this case is in average 2.5 cm
-KNOWN_WIDTH = 2.5
-
-
-def get_focal_length(landmarks, KNOWN_DISTANCE, KNOWN_WIDTH):
-
-    corner1, corner2, is_left = (36, 39, True)
-    x1, y1 = landmarks[corner1, :]
-    x2, y2 = landmarks[corner2, :]
-
-    eye_width = math.hypot(x2 - x1, y2 - y1)
-
-    focal_Length = (eye_width * KNOWN_DISTANCE) / KNOWN_WIDTH
-
-    return focal_Length
-
-
 def estimate(eye1):
     point1 = to_3D(eye1.coordinates)
     print(point1)
@@ -308,7 +287,6 @@ class Model:
         # link: https://drive.google.com/firun_prele/d/1XvAobn_6xeb8Ioa8PBnpCXZm8mgkBTiJ/view?usp=sharing
         self.landmark_predictor = dlib.shape_predictor(args.model_crop_eyes)
 
-        self.count = 0
         self.gaze_history = []
 
         self.datasource, self.preprocessor, self.sess, self.model = setup(args)
@@ -336,24 +314,6 @@ class Model:
         landmarks = self.landmark_predictor(frame_gray, face)
         # converting co-ordinates to NumPy array
         landmarks = land2coords(landmarks)
-
-        if self.count == 0:
-            self.focal_length = get_focal_length(
-                landmarks, KNOWN_DISTANCE, KNOWN_WIDTH)
-            self.count += 1
-
-        corner1, corner2 = (36, 39)
-
-        x1, y1 = landmarks[corner1, :]
-        x2, y2 = landmarks[corner2, :]
-
-        eye_width = math.hypot(x2 - x1, y2 - y1)
-
-        distance = distance_to_camera(KNOWN_WIDTH, self.focal_length, eye_width)
-        cv2.putText(frame, "%.2f cm" % (
-            distance), (frame.shape[1] - 200, frame.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 2)
-
-        # cv2.circle(frame, (447, 63), 10, (0, 0, 255), -1)
 
         eyes = get_eye_info(self.args, landmarks, frame_gray)
         face = (face.left(), face.top(), face.right(), face.bottom())
