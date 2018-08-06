@@ -18,9 +18,11 @@ pip3 install -r requirements.txt
 
 Esse passo não é obrigatório, versões pre-treinadas do modelo podem ser [encontradas aqui](https://drive.google.com/open?id=11W2kSWEKYQrJXrpiodB4J73OCCgbe54S). Para ter acesso aos modelos pre-treinados é necessário ter um email @ccc.ufcg.edu.br.
 
-* Para treinar o modelo primeiro siga as intruções disponíveis [aqui]( https://www.cl.cam.ac.uk/research/rainbow/projects/unityeyes/) para gerar as imagens da base unityEyes. **Aparentemente funciona apenas no Windows**.
+* Baixe os dados do [Kaggle](https://www.kaggle.com/c/mp18-eye-gaze-estimation) utilizados num campeonato para estimar o vetor de visão.
 
-* Salve os dados do unityEyes na pasta *datasets*
+* [OPCIONAL] Siga as intruções disponíveis [aqui](https://www.cl.cam.ac.uk/research/rainbow/projects/unityeyes/) para gerar as imagens para validação da base unityEyes. **Aparentemente funciona apenas no Windows**.
+
+* Salve os dados do unityEyes na pasta *datasets*.
 
 * Execute o arquivo *preprocess_data.py* da seguinte forma:
 
@@ -49,6 +51,10 @@ Para obter predições do modelo para uma dada imagem basta executar:
 ```bash
 python predict_cnn.py  --input-image preprocessed_data/x.pickle  --model-checkpoint checkpoints/best_cnn.ckpt
 ```
+
+Para avaliar o modelo com uma base de dados:
+
+```python eval_cnn.py --input-path preprocessed_images/test/ --model-checkpoint checkpoints/best-cnn.ckpt```
 
 ### 3. Estimar vetor da visão (Gaze estimation)
 

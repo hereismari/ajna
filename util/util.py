@@ -65,12 +65,15 @@ def mkdir(folder):
     if not os.path.exists(folder):
         os.makedirs(folder)
 
+        
 def load_pickle(filename):
      return pickle.load(open(filename, 'rb'))
+    
     
 def get_basename(filepath):
     return os.path.splitext(os.path.basename(filepath))[0]
 
+  
 def plot_predictions(output, input_data, eye_shape):
     eye = input_data['eye'].reshape(*eye_shape)
 
