@@ -306,7 +306,7 @@ class Model:
         face_boundaries = self.face_detector(frame_gray, 0)
         # if there's no face do nothing
         if len(face_boundaries) < 1:
-            return frame, None
+            return frame_rgb, None
 
         face = face_boundaries[0]
         # for face in face_boundaries:
