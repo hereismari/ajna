@@ -23,7 +23,6 @@ class UnityEyes(Preprocessor):
 
     def __init__(self,
                  generate_heatmaps=False,
-                 eye_image_shape=(36, 60),
                  heatmaps_scale=1.0,
                  **kwargs):
         
@@ -31,7 +30,6 @@ class UnityEyes(Preprocessor):
         super().__init__(**kwargs)
 
         # Cache some parameters
-        self._eye_image_shape = eye_image_shape
         self._heatmaps_scale = heatmaps_scale
 
         # Create global index over all specified keys
