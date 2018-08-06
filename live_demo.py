@@ -21,12 +21,11 @@ from multiprocessing import Queue, Pool
 
 import math
 
-NUM_CLASSES = 90
-
 from data_sources.img_data_source import ImgDataSource
 from preprocessing.img_preprocessor import ImgPreprocessor
 from models.cnn import CNN
 from learning.trainer import Trainer
+
 
 import argparse
 parser = argparse.ArgumentParser(description='Webcam')
@@ -46,14 +45,18 @@ parser.add_argument('-q-size', '--queue-size', dest='queue_size', type=int,
 args = parser.parse_args()
 
 
-IRIS_X = 1000
-IRIS_Y = 500
-old_iris = None
+import pygame
+pygame.init()
+info_monitor = pygame.display.Info()
+MAX_Y = info_monitor.current_h 
+MAX_X = info_monitor.current_w
+MIN_X = 50
+MIN_Y = 50
 
-MAX_X = 20000
-MAX_Y = 20000
-MIN_X = 0
-MIN_Y = 0
+
+# CURSOR START
+CURSOR_X = int(MAX_Y / 2)
+CURSOR_Y = int(MAX_X / 2)
 
 
 # Function for creating landmark coordinate list
@@ -133,33 +136,29 @@ def get_eye_info(landmarks, frame_gray):
     return eyes
 
 
-def _limit_mouse(pos_x, pos_y):
-    global MAX_X, MIN_X, MAX_Y, MIN_Y
+def move_mouse(theta, phi, thresholds, intensity=80):
+    def _limit_mouse(pos_x, pos_y):
+        global MAX_X, MIN_X, MAX_Y, MIN_Y
 
-    pos_x = max(MIN_X, min(pos_x, MAX_X))
-    pos_y = max(MIN_Y, min(pos_y, MAX_Y))
+        pos_x = max(MIN_X, min(pos_x, MAX_X))
+        pos_y = max(MIN_Y, min(pos_y, MAX_Y))
 
-    return pos_x, pos_y
+        return pos_x, pos_y
 
-
-def move_mouse(theta, phi, thresholds):
-    global old_iris, IRIS_X, IRIS_Y
-
-    print(theta, phi)
-
+    global CURSOR_X, CURSOR_Y
     if theta > thresholds['up']:
-        IRIS_Y -= 80
+        CURSOR_Y -= intensity
     elif theta < thresholds['down']:
-        IRIS_Y += 80
+        CURSOR_Y += intensity
     
     if phi < thresholds['left']:
-        IRIS_X -= 80
+        CURSOR_X -= intensity
     elif phi > thresholds['right']:
-        IRIS_X += 80
+        CURSOR_X += intensity
 
 
-    IRIS_X, IRIS_Y = _limit_mouse(IRIS_X, IRIS_Y)
-    cmd = 'xdotool mousemove %s %s' % (IRIS_X, IRIS_Y)
+    CURSOR_X, CURSOR_Y = _limit_mouse(CURSOR_X, CURSOR_Y)
+    cmd = 'xdotool mousemove %s %s' % (CURSOR_X, CURSOR_Y)
     os.system(cmd)
 
 
