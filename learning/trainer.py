@@ -5,10 +5,10 @@ import csv
 from util import util
 
 class Trainer(object):
-    def __init__(self, model, model_checkpoint='checkpoints/last_cnn.ckpt'):
+    def __init__(self, model, model_checkpoint='checkpoints/last_cnn.ckpt', eval_steps=10000):
         self.model = model
 
-        self.eval_steps = 100
+        self.eval_steps_mod = eval_steps
         self.exec_name = 'train'
         self.running_losses = {}
         self.eval_losses = {}
@@ -98,7 +98,7 @@ class Trainer(object):
 
     def train_step(self, sess, data, eval=True):
         self.train_batch(sess, data)
-        if eval and (self.running_steps % self.eval_steps == 0) or (self.running_steps + 1 == self.max_steps):
+        if eval and ((self.running_steps % self.eval_steps_mod == 0) or (self.running_steps + 1 == self.max_steps) or self.running_steps == 1):
             self.eval_step_train(sess, data.train)
             self.eval(sess, data)
             data.train.run(sess)

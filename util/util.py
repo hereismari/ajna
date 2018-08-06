@@ -103,7 +103,6 @@ def _plot_predictions(ax, data, colors=['purple', 'orange',  'magenta']):
     landmarks['iris_centre'] = eye_landmarks[16, :].reshape(1, 2)
     
     for key, color in zip(landmarks, colors):
-        print(color)
         landmark = landmarks[key]
         for points in landmark:
             circ = Circle((points[0], points[1]), 1, alpha=0.7, color=color)

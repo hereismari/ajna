@@ -65,7 +65,7 @@ class Data(object):
     
         self._dataset_single = base_dataset.cache().batch(self.batch_size)
         self._dataset = base_dataset.cache() \
-                .shuffle(self._num_examples + 100, seed=seed) \
+                .shuffle(10000, seed=seed) \
                 .repeat().batch(self.batch_size) \
                 .prefetch(2 * self.batch_size)
         

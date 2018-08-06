@@ -25,7 +25,6 @@ class CNN(object):
 
         # NCHW
         self._data_format_longer = 'channels_first' if data_format == 'NCHW' else 'channels_last'
-        print(data_format)
         self._data_format = data_format
         self.use_batch_statistics = True
         self.is_training = True
@@ -149,6 +148,7 @@ class CNN(object):
                 ])
             else:
                 loss_terms['heatmaps_mse'] = None
+
             x = h
             outputs['heatmaps'] = x
             self.heatmaps = x

@@ -11,9 +11,9 @@ import argparse
 
 parser = argparse.ArgumentParser(description='Train CNN (Elg).')
 parser.add_argument('--input-image', type=str, required=True)
-parser.add_argument('--model-checkpoint', type=str, required=True)
+parser.add_argument('--model-checkpoint', type=str, default='checkpoints/best_cnn.ckpt')
 
-parser.add_argument('--eye-shape', type=int, nargs="+", default=[90, 60])
+parser.add_argument('--eye-shape', type=int, nargs="+", default=[60, 90])
 parser.add_argument('--heatmap-scale', type=float, default=1)
 parser.add_argument('--data-format', type=str, default='NCHW')
 
