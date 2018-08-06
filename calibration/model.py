@@ -321,7 +321,7 @@ class Model:
             eye_landmarks, heatmaps, eye_radius = detect_eye_landmarks(eye['image'], self.datasource, self.preprocessor, self.sess, self.model)
             eye_landmarks = eye_landmarks.reshape(18, 2)
             bgr, self.gaze_history, gaze = estimate_gaze(
-                self.gaze_history, eye, heatmaps, landmarks, eye_landmarks, eye_radius, face, frame)
+                self.gaze_history, eye, heatmaps, landmarks, eye_landmarks, eye_radius, face, frame_rgb)
 
             for (a, b) in landmarks.reshape(-1, 2):
                 cv2.circle(frame, (a, b), 2, (0, 255, 0), -1)
