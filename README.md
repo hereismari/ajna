@@ -60,8 +60,22 @@ Para avaliar o modelo com uma base de dados:
 
 Para tal é necessário uma webcam.
 
-Basta rodar:
+1. Calibrar direção dos vetores de visão
+
+```bash
+cd calibration
+python calibrate.py --model-checkpoint ../checkpoints/best_cnn.ckpt
+```
+
+2. Executar aplicação que move o mouse
 
 ```bash
 python live_demo.py --model-checkpoint checkpoints/best_cnn.ckpt
+```
+
+3. [OPCIONAL] Demonstração de interface movendo mouse
+
+```bash
+cd interface
+python interface.py
 ```
