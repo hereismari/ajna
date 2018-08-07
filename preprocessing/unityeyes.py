@@ -251,7 +251,7 @@ class UnityEyes(Preprocessor):
                 for landmark in res['landmarks']
             ]).astype(np.float32)
             if self.data_format == 'NHWC':
-                np.transpose(entry['heatmaps'], (1, 2, 0))
+                np.transpose(res['heatmaps'], (1, 2, 0))
 
         return res
 
@@ -265,17 +265,18 @@ class UnityEyes(Preprocessor):
             jpg_path = '%s/%s.jpg' % (self._input_path, file_stem)
             json_path = '%s/%s.json' % (self._input_path, file_stem)
             
-            with open(json_path, 'r') as f:
-                json_data = ujson.load(f)
-            
-                entry = {
-                    'full_image': cv.imread(jpg_path, cv.IMREAD_GRAYSCALE),
-                    'json_data': json_data
-                }
+            if os.path.exists(json_path):
+                with open(json_path, 'r') as f:
+                    json_data = ujson.load(f)
+                
+                    entry = {
+                        'full_image': cv.imread(jpg_path, cv.IMREAD_GRAYSCALE),
+                        'json_data': json_data
+                    }
 
-                preprocessed_entry = self.preprocess_entry(entry)
-                if preprocessed_entry is not None:
-                    self._save_pickle(preprocessed_entry, os.path.join(self._output_path, '%s.pickle' % file_stem))
+                    preprocessed_entry = self.preprocess_entry(entry)
+                    if preprocessed_entry is not None:
+                        self._save_pickle(preprocessed_entry, os.path.join(self._output_path, '%s.pickle' % file_stem))
             
             if current_index % 1000 == 0 and current_index != 0:
                 print('preprocessed %s entries in %s' % (current_index, (time.time()-t)))

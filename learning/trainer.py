@@ -5,21 +5,22 @@ import csv
 from util import util
 
 class Trainer(object):
-    def __init__(self, model, model_checkpoint='checkpoints/last_cnn.ckpt'):
+    def __init__(self, model, model_checkpoint='checkpoints/last_cnn.ckpt', eval_steps=10000):
         self.model = model
 
-        self.eval_steps = 100
+        self.eval_steps_mod = eval_steps
         self.exec_name = 'train'
         self.running_losses = {}
         self.eval_losses = {}
         self.best_loss = 100  # INF
-        self.model_checkpoint=model_checkpoint
+        self.model_checkpoint = model_checkpoint
         self.running_loss, self.running_steps = 0, 0
 
     def run_training(self, data, max_steps, eval=True, test=True, output_path='checkpoints/last_cnn.ckpt'):
         self.max_steps = max_steps
         self.saver = tf.train.Saver()
         print('Training')
+
         with tf.Session() as sess:
             self.initialize_vars(sess)
             self.train(sess,data, eval=eval)
@@ -35,9 +36,25 @@ class Trainer(object):
     
     def run_predict(self, eval_data):
         saver = tf.train.Saver()
-        with tf.Session() as sess:
-            saver.restore(sess, self.model_checkpoint)
-            return self.predict(sess, eval_data)
+        if self.session is None:
+            self.session = tf.Session()
+            self.initialize_vars(self.session)
+            saver.restore(self.session, self.model_checkpoint)
+        return self.predict(self.session, eval_data)
+
+    def run_model(self, eval_data):
+        saver = tf.train.Saver()
+        if self.session is None:
+            self.session = tf.Session()
+            self.initialize_vars(self.session)
+            saver.restore(self.session, self.model_checkpoint)
+        return self._run_model(self.session, eval_data)
+    
+    def _run_model(self, sess, data):
+        data.eval.run_single(sess)
+        self.model.eval(sess)
+        input_img, landmarks = self.model.run_model(sess)
+        return input_img, landmarks
 
 
     def initialize_vars(self, sess):
@@ -79,7 +96,7 @@ class Trainer(object):
 
     def train_step(self, sess, data, eval=True):
         self.train_batch(sess, data)
-        if eval and (self.running_steps % self.eval_steps == 0) or (self.running_steps + 1 == self.max_steps):
+        if eval and ((self.running_steps % self.eval_steps_mod == 0) or (self.running_steps + 1 == self.max_steps) or self.running_steps == 1):
             self.eval_step_train(sess, data.train)
             self.eval(sess, data)
             data.train.run(sess)

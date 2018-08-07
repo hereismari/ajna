@@ -5,10 +5,9 @@ Modified by: @mari-linhares
 
 import tensorflow as tf
 import numpy as np
-from tensorflow.contrib.tensorboard.plugins import projector  # pylint: disable=e0611
 
 class CNN(object):
-    def __init__(self, data_holder, input_shape, learning_schedule):
+    def __init__(self, data_holder, input_shape, learning_schedule, data_format='NCHW', predict_only=False):
         self._training = tf.Variable(True, dtype=tf.bool, trainable=False)
         self._train = tf.assign(self._training, True)
         self._eval = tf.assign(self._training, False)
@@ -16,7 +15,7 @@ class CNN(object):
         self.train_count = tf.Variable(0.0, trainable=False)
         self.increase_train_count = tf.assign_add(self.train_count, 1)
 
-        self.define_data(data_holder)
+        self.define_data(data_holder, predict_only)
 
         self._hg_first_layer_stride = 1
         self._hg_num_modules = 3
@@ -25,15 +24,14 @@ class CNN(object):
         self._hg_num_residual_blocks = 1
 
         # NCHW
-        self._data_format_longer = 'channels_first'
-        self._data_format = 'NCHW'
+        self._data_format_longer = 'channels_first' if data_format == 'NCHW' else 'channels_last'
+        self._data_format = data_format
         self.use_batch_statistics = True
         self.is_training = True
 
         self._learning_schedule = learning_schedule
 
-        self.get_model()
-
+        self.get_model(predict_only)
 
 
     @staticmethod
@@ -46,34 +44,43 @@ class CNN(object):
         sess.run(self.increase_train_count)
         return sess.run(self.backprop)
     
+    def run_model(self, sess):
+        return sess.run([self.X, self.landmarks, self.heatmaps, self.radius])
+
     def eval_iteration(self, sess):
         return sess.run(self.run_eval)
 
-    def get_model(self):
-        X_pred, losses, metrics = self.build_model()
+    def get_model(self, predict_only=False):
+        X_pred, losses, metrics = self.build_model(predict_only)
         
         self.model = X_pred
         self.losses = losses
         self.metrics = metrics
 
         # Summaries
-        heatmap_summary = tf.summary.scalar("heatmaps_mse", self.losses['heatmaps_mse'])
-        radius_summary = tf.summary.scalar("radius_mse", self.losses['radius_mse'])
-        self.summaries = tf.summary.merge_all()
+        if not predict_only:
+            heatmap_summary = tf.summary.scalar("heatmaps_mse", self.losses['heatmaps_mse'])
+            radius_summary = tf.summary.scalar("radius_mse", self.losses['radius_mse'])
+            self.summaries = tf.summary.merge_all()
 
-        self.train_writer = tf.summary.FileWriter('checkpoints/train')
-        self.eval_writer = tf.summary.FileWriter('checkpoints/test')
+            self.train_writer = tf.summary.FileWriter('checkpoints/train')
+            self.eval_writer = tf.summary.FileWriter('checkpoints/test')
 
+            self.run_eval = [self.summaries, self.model, self.losses]
+        else:
+            self.run_eval = [self.model, self.model, self.model]
+        if not predict_only:
+            self.build_optimizer()
 
-        self.run_eval = [self.summaries, self.model, self.losses]
-        self.build_optimizer()
+    def define_data(self, data_holder, predict_only=False):
+        if predict_only:
+            self.X = data_holder
+        else:
+            self.X = data_holder[0]
 
-    def define_data(self, data_holder):
-        self.X = data_holder[0]
-
-        self.Y1 = data_holder[1]
-        self.Y2 = data_holder[2]
-        self.Y3 = data_holder[3]
+            self.Y1 = data_holder[1]
+            self.Y2 = data_holder[2]
+            self.Y3 = data_holder[3]
     
     def build_optimizer(self):
         self._build_optimizers()
@@ -105,7 +112,7 @@ class CNN(object):
             self._optimize_ops.append(optimize_ops)
             print('Built optimizer for: %s' % ', '.join(loss_terms.keys()))
 
-    def build_model(self):
+    def build_model(self, predict_only=False):
         outputs = {}
         loss_terms = {}
         metrics = {}
@@ -129,21 +136,36 @@ class CNN(object):
                         x_prev, x, do_merge=(i < (self._hg_num_modules - 1)),
                     )
                     
-                    metrics['heatmap%d_mse' % (i + 1)] = CNN._tf_mse(h, self.Y1)
+                    if not predict_only:
+                        metrics['heatmap%d_mse' % (i + 1)] = CNN._tf_mse(h, self.Y1)
+                    else:
+                        metrics['heatmap%d_mse' % (i + 1)] = None
                     x_prev = x
             
-            loss_terms['heatmaps_mse'] = tf.reduce_mean([
-                metrics['heatmap%d_mse' % (i + 1)] for i in range(self._hg_num_modules)
-            ])
+            if not predict_only:
+                loss_terms['heatmaps_mse'] = tf.reduce_mean([
+                    metrics['heatmap%d_mse' % (i + 1)] for i in range(self._hg_num_modules)
+                ])
+            else:
+                loss_terms['heatmaps_mse'] = None
+
             x = h
             outputs['heatmaps'] = x
+            self.heatmaps = x
 
         # Soft-argmax
         x = self._calculate_landmarks(x)
+        self.landmarks = x
+
         with tf.variable_scope('upscale'):
             # Upscale since heatmaps are half-scale of original image
             x *= self._hg_first_layer_stride
-            metrics['landmarks_mse'] = CNN._tf_mse(x, self.Y2)
+
+            if not predict_only:
+                metrics['landmarks_mse'] = CNN._tf_mse(x, self.Y2)
+            else:
+                metrics['landmarks_mse'] = None
+            
             outputs['landmarks'] = x
 
         # Fully-connected layers for radius regression
@@ -156,9 +178,15 @@ class CNN(object):
                 x = self._apply_fc(x, 1)
             outputs['radius'] = x
             
-            metrics['radius_mse'] = CNN._tf_mse(tf.reshape(x, [-1]), self.Y3)
-            loss_terms['radius_mse'] = 1e-7 * metrics['radius_mse']
+            if not predict_only:
+                metrics['radius_mse'] = CNN._tf_mse(tf.reshape(x, [-1]), self.Y3)
+                loss_terms['radius_mse'] = 1e-7 * metrics['radius_mse']
+            else:
+                metrics['radius_mse'] = None
+                loss_terms['radius_mse'] = None
 
+        self.radius = x
+        
         # Define outputs
         return outputs, loss_terms, metrics
 
