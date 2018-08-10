@@ -2,6 +2,8 @@
 
 IA capaz de identificar onde um usuário está olhando na tela, a fim de facilitar o uso do computador.
 
+[DEMO](https://www.dropbox.com/s/12zs9bi8rhzztqd/calibration-demo.gif?dl=0)
+
 ## Dependências
 
 Deve ser utilizado Python 3.6.
